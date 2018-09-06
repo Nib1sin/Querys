@@ -1,0 +1,56 @@
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////*Dati da copertina posizione
+
+
+import it.sydema.laweb.domain.Enums.TipoRapportoSyges
+import it.sydema.laweb.domain.Enums.TipoPrevisioneSyge
+
+
+def	rapporti = service.rapportiPerPosizione(posizione_id).collect{
+	[
+		id		:it.id,					//id
+		text		:it.descrizioneRapporto,		//descrizioneRapporto
+		numero		:it.saldo				//saldo
+		tassoIRR	:it.tassoIRR,				//tassoIRR
+		dataApertura	:it.dataApertura,		
+		dataChiusura	:it.dataChiusura			//dataChiusura
+	]
+									};
+	if(rapporti)
+	{
+		rapporti[0]._tableConfig = [scrollable: true]
+		rapporti[0]._config = [
+					"id"		: [index: 0, label: "id"],
+					"text"		: [index: 1, label: "Descrizione"],
+					"numero"	: [index: 2, label: "Numero rapporto"],
+					"valore"	: [index: 3, label: "Valore"],
+					"tassoIRR"	: [index: 4, label: "Tasso IRR"],
+					"dataApertura"	: [index: 5, label: "Data Apertura"],
+					"dataChiusura"	: [index: 6, label: "Data Chiusura"]
+					]	
+	}
+	
+	rapporti.sort{it.id}
+
+
+/////////Recupero tutti i numeri rapporti presenti e li concateno in un'unica stringa
+
+def	numeroRapporti = ""
+
+rapporti.each{
+		numeroRapporti += it.numero + ", "
+		}
+
+////////Recupero il totale esigibile
+
+def	somma = 0
+
+rapporti.each{
+		somma += it.valore
+		}
+
+

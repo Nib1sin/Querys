@@ -1,0 +1,41 @@
+
+//Funzione aggregazione una riga in altra
+
+
+query.each{ x ->
+		def	pro= x[0]
+		def processoTask = '     '
+		
+		def cesso = 		entityManager.createNativeQuery("""
+			                        select distinct
+			                      
+			                        concat(dp.descrizione, ' - ', dt.nome) as PROCESSO_ATTIVO_TASK_ATTIVO
+			                        from
+			                        laweb4.Posizione p 
+			                        
+                                    join laweb4.entitaProcesso ep 
+                                    on p.id = ep.idEntita
+                                    
+                                    join laweb4.IstanzaProcesso ip 
+                                    on ip.id = ep.istanzaProcesso_id
+                                    
+                                    join laweb4.IstanzaTask it
+									on it.istanzaprocesso_id = ip.id
+									and it.statoIstanza = 2
+									
+									join laweb4.definizionetask dt
+                                    on dt.id = it.definizioneTask_id
+
+                                     join laweb4.DefinizioneProcesso dp
+                                    on dp.id = ip.definizioneProcesso_id
+									
+									where p.id = $pro
+									and it.statoistanza = 2
+									and ip.statoIstanza = 2
+										
+											""")
+		cesso.resultList.each{ y ->
+				processoTask = processoTask + y + '  |  '
+							}
+							x[17] = processoTask
+	}

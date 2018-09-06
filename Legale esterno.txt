@@ -1,0 +1,33 @@
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////*Legale esterno
+
+
+import it.sydema.laweb.domain.Enums
+
+def	legale_esterno = first(entityManager.createQuery
+	("""
+		select	eor.nomeCompleto as nomeLegale
+		from	StoricoReferenteEntita			sre,
+			ProceduraLegale				pl
+		join	sre.elementoOrganizzativoReferente	eor
+		join	sre.infoEntita				ie
+		join	sre.ruoloReferenteEntita		rre
+		join	pl.elementiAssociatiProcedureLegali	eap
+			with
+			eap.tipoElementoAssociatoProceduraLegale = it.sydema.laweb.domain.Enums\$TipoElementoAssociatoProceduraLegale.POSIZIONE
+		where	
+			er.idEntita = pl.id
+			and
+			ie.entita = it.sydema.laweb.domain.Enums\$Entita.PROCEDURA_LEGALE
+			and
+			rre.classeElementoOrganizzativo = it.sydema.laweb.domain.Enums\$ClasseElementoOrganizzativo.SLE
+			and
+			sre.corrente = true
+			and
+			eap.idElemento = :posizione_id
+	""").setParameter('posizione_id', posizione_id).resulList
+				)

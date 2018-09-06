@@ -1,0 +1,61 @@
+di seguito la funzione groovy per raggruppare i rapporti relativi ad una posizione.
+
+Teo
+
+
+def rapportiPos=''
+    
+    def resRapp= entityManager.createQuery ("""
+                select 
+                    new Map(
+                        ip.id as istanzaProcessoId,
+                        dp.id as definizioneProcessoId,
+                        ap.id as attributoProcessoId,
+                        it.id as istanzaTaskId,
+                        iat.id as istAttrTaskID,
+                        ap.codice as codiceAttributo,
+                        iat.valoreJson as rapporto
+                    )
+                from 
+                    EntitaProcesso ep 
+                    left join ep.istanzaProcesso ip
+                    left join ip.definizioneProcesso dp
+                    left join ip.istanzeTasks it
+                    left join it.istanzeAttributiTasks iat
+                    left join iat.attributoProcesso ap
+                where 
+                    ep.entita='POSIZIONE'
+                    and ap.codice in('SLZNE_RPPRTI','ELNCO_RPPRTI')
+                    and it.statoIstanza not in (it.sydema.laweb.domain.Enums\$StatoIstanza.ANNULLATO)
+                    and ip.id=${it[21]}  // id del processo da cui estrarre i rapporti
+                """).resultList
+
+                if(resRapp){
+                    resRapp.each{z ->
+                      
+                        def  rapp=''
+                        if(z.codiceAttributo == 'SLZNE_RPPRTI'){
+                            
+                            rapp= jsonSlurper.parseText(z.rapporto).idElemento
+                            
+                        }else{
+                            rapp= jsonSlurper.parseText(z.rapporto).id
+                        }
+                      
+                        def unRapporto = entityManager.createQuery(""" 
+                        select  new Map(
+                        (r.codiceCategoria +'-'+r.codiceFiliale +'-'+ r.codiceRapporto) as rapporto)
+                        from Rapporto r
+                        where r.id=$rapp
+                        """)
+                        
+                        unRapporto.resultList.each{w ->
+                                
+                                rapportiPos = rapportiPos + w.rapporto +'|'
+                                
+                            }
+                    }
+                   
+                }else{
+                    rapportiPos = ''
+                }

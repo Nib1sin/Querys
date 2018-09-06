@@ -1,0 +1,31 @@
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////*Dati da workflow
+
+import it.sydema.laweb.domain.Enums
+
+def	dato_da_workflow = first(entityManager.createQuery
+	("""
+		select		ia.valoreStringa 		<------ o valoreData o valoreIntero (dipende da cosa ci serve)
+		from		IstanzaAttributoTask		ia
+		left join	ia.attributoProcesso		ap
+		left join	ia.istanzaProcesso		ip
+		left join	it.istanzaProcesso		ip
+		join		ip.definizioneProcesso		dp
+		left join	ip.entiteProcessi		ep
+		left join	it.definizioneTask		dt
+		where
+				dt.codiceIdentificativo = 'codice_task'
+				and
+				ep.entita = it.sydema.laweb.domain.Enums\$Entita.POSIZIONE
+				and
+				dp.descrizione = 'nome_task'
+				and
+				ep.idEntita = :posizione_id
+				and
+				ap.codice = 'Attributo_che_ci_cerve'
+	""").setParameter('posizione_id, posizione_id).resulList
+				)

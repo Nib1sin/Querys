@@ -1,0 +1,36 @@
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////*Nominativo, indirizzo, CAP, comune e provincia del collegato
+
+def	tabellaIndirzzi = []
+
+def	indirizzi = entityManager.createQuery
+	("""
+		select	new Map(
+				sogg.nomeCompleto	as	nome,
+				lu.cap			as	cap,
+				lu.nomeComune		as	nomeComune,
+				lu.nomeProvincia	as	nomeProvincia,
+				lu.indirizzo		as	indirizzo
+				)
+		from		Posizione			p
+		join		p.collegatiPosizioni		coll
+		join		coll.soggettoAnagrafico		sogg
+		left join	sogg.luoghi			lu
+		where
+				p.id = :posizione_id
+	""").setParameter('posozione_id', posizione_id.resultList
+	
+def	indirizzoIntero = ""
+
+	indirizzi.each{
+		indirizzoIntero = it.cap + " " + it.nomeComune + "(" + it.nomeProvincia + ")" + " " it.indirizzo
+		tabellaIndirizzi.add([
+					nome		:	it.nome,
+					indirizzo	:	indirizzoIntero
+					])
+			}
+

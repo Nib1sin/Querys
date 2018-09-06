@@ -1,0 +1,29 @@
+
+// Cambia una virgola in un punto
+
+
+query.collect{
+    def model = [
+        id:  it[0] ? it[0] : '',
+        intestazione:  it[1] ? it[1] : '',
+        ndg:  it[2] ? it[2] : '',
+        codicePratica:  it[3] ? it[3] : '',
+        codiceIstituto:  it[4] ? it[4] : '',
+        classificazione:  it[5] ? it[5] : '',
+        dataApertura:  it[6] ? it[6] : '',
+        stato:  it[7] ? it[7] : '',
+        filiale_nomeCompleto:  it[8] ? it[8] : '',
+        garanziePersonali:  it[9] ? it[9] : '',
+        garanzieReali:  it[10] ? it[10] : '',
+        nomeGestore:  it[11] ? it[11] : '',
+        nomeMandatario:  it[12] ? it[12] : '',
+        dataAssegnazioneMandatario:  it[13] ? it[13] : '',
+        nomeLegaleEsterno:  it[14] ? it[14] : '',
+        saldo:  it[15] ? it[15].toString().replace('.' , ',') : '',
+        incassi:  it[16] ? it[16].toString().replace('.' , ',') : '',
+        processoTask:  it[17] ? it[17] : '',
+        prevPerditaTotale:  it[18] ? it[18].toString().replace('.' , ',') : ''
+    ]
+    
+    orderedResult.add(model);
+}

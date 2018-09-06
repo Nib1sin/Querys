@@ -1,0 +1,9 @@
+select iat.* from laweb4.istanzatask it
+join laweb4.istanzaattributotask  iat 
+on iat.istanzaTask_id = it.id 
+where it.id = 146998
+
+
+update laweb4.istanzaattributotask set valoreData = '2016-12-06 00:00:00.00' where id = 
+update laweb4.istanzaattributotask set valoreDecimale =  5647322.66 where id = 
+update laweb4.istanzaattributotask set valoreStringa = '5647322,66' where id = 
