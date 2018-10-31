@@ -27,3 +27,9 @@ query.collect{
     
     orderedResult.add(model);
 }
+
+
+it[16] ? it[16].toString().format("%.2f", it[16]) : '0',
+
+valore_immobile : it[16] ? "\t" + it[16].toString().replace('.' , ',') + "\t" : '0',
+
