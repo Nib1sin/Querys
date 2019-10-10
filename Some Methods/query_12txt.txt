@@ -1,0 +1,21 @@
+select	ip.id as idProcesso,
+					max(case when ap.codice = 'DATA_UDNZA' then iat.valoreData end) as [Data Udienza],
+					max(case when ap.codice = 'DATA_RNVO_MDSMI_INCMBNTI' then iat.valoreData end) as [Data Rinvio Medesimi Incombenti],
+					max(case when ap.codice = 'VOTO_ESPRSSO_BNCA' then iat.valoreStringa end) as [Voto Espresso Dalla Banca],
+					max(case	when ap.codice = 'APPRVZNE_CNCRDTO' and iat.valoreBooleano = 0 then 'No' 
+								when ap.codice = 'APPRVZNE_CNCRDTO' and iat.valoreBooleano = 1 then 'Si'
+					end) as [Approvazione Concordato],
+					max(case when ap.codice = 'IMPRTO_CMPLSSVO_ATTSO_BNCA' then iat.valoreDecimale end) as [Importo Complessivo Atteso Dalla Banca],
+					max(case when ap.codice = 'PRCNTLE_PRVSTA_CRDTO_PRVLGTO' then iat.valoreDecimale end) as [Percentuale Prevista Per Credito Privilegiato],
+					max(case when ap.codice = 'PRCNTLE_PRVSTA_CRDTO_CHRGRFRO' then iat.valoreDecimale end) as [Percentuale Prevista Per Credito Chirografario]
+            from laweb4.istanzaProcesso ip
+            left join laweb4.definizioneProcesso dp on ip.definizioneProcesso_id = dp.id
+            left join laweb4.istanzatask it on it.istanzaprocesso_id = ip.id and	(it.statoIstanza in (1,2,3,6))
+            left join laweb4.definizioneTask dt on dt.id = it.definizioneTask_id
+            left join laweb4.istanzaAttributoTask iat on iat.istanzaTask_id = it.id
+            left join laweb4.attributoProcesso ap on ap.id = iat.attributoProcesso_id
+            where	dp.descrizione = 'Concordato Preventivo'
+					and dt.nome = 'Udienza'
+                    and ap.codice in ('DATA_UDNZA', 'DATA_RNVO_MDSMI_INCMBNTI', 'VOTO_ESPRSSO_BNCA', 'APPRVZNE_CNCRDTO', 'IMPRTO_CMPLSSVO_ATTSO_BNCA', 'PRCNTLE_PRVSTA_CRDTO_PRVLGTO', 'PRCNTLE_PRVSTA_CRDTO_CHRGRFRO')
+					
+			group by ip.id

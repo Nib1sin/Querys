@@ -1,0 +1,105 @@
+ import org.joda.time.DateTime
+import java.sql.Timestamp
+import java.text.SimpleDateFormat 
+import java.text.DateFormat 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ def eventi = entityManager.createQuery("""
+        select 
+            new Map(
+                ec.id as EventoId,
+                tec.descrizione as Descrizione,  
+                ec.oggetto as Oggetto, 
+                ec.dataInizio as DataInizio,
+                ec.dataFine as DataFine, 
+                ec.giorniTolleranza as GiorniTolleranza, 
+                ec.giorniPreavviso as GiorniPreavviso, 
+                ec.istanzaTask.id as IstanzaTaskId,  
+                dt.codiceNodo as CodiceTask, 
+                dt.nome as NomeTask,
+                day_diff(current_date(),ec.dataInizio) as diffGiorniAllaScadenza,
+                ec.giorniPreavviso - day_diff(current_date(),ec.dataInizio) as diffPreavvisoGiorniMancanti,
+        
+        
+                p.id as posizioneId,
+                p.intestazione as intestazione,
+                sre.dataInizioValidita as dataInizioValidita,
+                eor.id as elementoOrganizzativoReferente_id,
+                eor.nomeCompleto as elementoOrganizzativoReferente_nomeCompleto,
+                rre.descrizione as ruolo
+            )
+        from EventoCalendario ec, Posizione p, StoricoReferenteEntita sre
+        left join ec.tipoEventoCalendario tec
+        left join ec.istanzaTask it
+        left join it.definizioneTask dt
+        
+        left join ec.infiEntite ie
+        left join sre.infoEntita ie_2
+        join sre.elementoOrganizzativoReferente eor
+        join sre.ruoloReferenteEntita rre
+        
+        where ec.giorniPreavviso is not null
+        and (ec.giorniPreavviso - day_diff(current_date(),ec.dataInizio)) > 0
+        
+        and ie.entita = 'POSIZIONE'
+        and ie.idEntita = p.id
+        
+        and ie_2.entita = it.sydema.laweb.domain.Enums\$Entita.POSIZIONE
+        and ie_2.idEntita = p.id
+        and sre.corrente = true
+        and rre.descrizione in ('Gestore','Legale Esterno', 'SRE')
+        
+        order by ec.dataInizio
+        
+        """)
+        .resultList
+        
+
+        
+        
+        def plusDayToDate = { sqlTimestamp, daysToAdd ->
+            DateTime data = new DateTime(sqlTimestamp)
+            return data.plusDays(daysToAdd).toDate()
+        }
+        
+        def minusDayToDate = { sqlTimestamp, daysToSubstract ->
+            DateTime data = new DateTime(sqlTimestamp)
+            return data.minusDays(daysToSubstract).toDate()
+        }
+        
+        def DateFormat df = new SimpleDateFormat("dd/MM/yyyy")
+        
+        eventi.each {
+            it.key = it.EventoId + "_" + it.IstanzaTaskId + "_" + it.CodiceTask
+        
+            it.Oggi = new Date()
+        
+            it.DataPreavvisoString = ""
+            it.DataInizioString = ""
+            it.DataFineString = ""
+            
+            if(it.DataInizio != null){
+                it.DataInizioString = df.format(it.DataInizio)    
+            }
+            if(it.DataFine != null){
+                it.DataFineString = df.format(it.DataFine)
+            }
+            
+            //Gestione Data Preavviso
+            it.DataPreavviso = null
+            if(it.GiorniPreavviso != null){
+                it.DataPreavviso =  minusDayToDate(it.DataInizio, it.GiorniPreavviso)
+                it.DataPreavvisoString = df.format(it.DataPreavviso)
+            }
+            
+            it.Data = it.DataInizioString
+            it.Preavviso = it.DataPreavvisoString
+        
+        }
+        
+        return eventi

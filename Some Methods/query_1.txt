@@ -1,0 +1,48 @@
+
+select	ip.id as idProcesso,
+		it.id as idTask,
+		[Data Udienza] = MAX(CASE
+						when ap.codice = 'DATA_UDNZA' then iat.valoreData
+						ELSE null end ),
+		[Data Rinvio Medesimi Incombenti] = MAX(CASE
+						when ap.codice = 'DATA_RNVO_MDSMI_INCMBNTI' then iat.valoreData
+						ELSE null end ),
+		[Voto Espresso Dalla Banca] = MAX(CASE
+						when ap.codice = 'VOTO_ESPRSSO_BNCA' then iat.valoreStringa
+						ELSE null end ),
+		[Approvazione Concordato] = MAX(CASE
+						when ap.codice = 'APPRVZNE_CNCRDTO' then CONVERT(int, iat.valoreBooleano)
+						ELSE null end ),
+		[Importo Complessivo Atteso Dalla Banca] = MAX(CASE
+						when ap.codice = 'IMPRTO_CMPLSSVO_ATTSO_BNCA' then iat.valoreDecimale
+						ELSE null end ),
+		[Percentuale Prevista Per Credito Privilegiato] = MAX(CASE
+						when ap.codice = 'PRCNTLE_PRVSTA_CRDTO_PRVLGTO' then iat.valoreDecimale
+						ELSE null end ),
+		[Percentuale Prevista Per Credito Chirografario] = MAX(CASE
+						when ap.codice = 'PRCNTLE_PRVSTA_CRDTO_CHRGRFRO' then iat.valoreDecimale
+						ELSE null end )
+						
+            from laweb4.istanzaProcesso ip
+            left join laweb4.definizioneProcesso dp on ip.definizioneProcesso_id = dp.id        
+			left join laweb4.istanzatask it on it.istanzaProcesso_id = ip.id and (it.statoIstanza in (1,2,3,6))
+            left join laweb4.definizioneTask dt on dt.id = it.definizioneTask_id
+            left join laweb4.istanzaAttributoTask iat on iat.istanzaTask_id = it.id
+            left join laweb4.attributoProcesso ap on ap.id = iat.attributoProcesso_id
+            where	dp.descrizione = 'Concordato Preventivo'
+					and dt.nome = 'Udienza'
+                    and ap.codice in ('DATA_UDNZA', 'DATA_RNVO_MDSMI_INCMBNTI', 'VOTO_ESPRSSO_BNCA', 'APPRVZNE_CNCRDTO', 'IMPRTO_CMPLSSVO_ATTSO_BNCA', 'PRCNTLE_PRVSTA_CRDTO_PRVLGTO', 'PRCNTLE_PRVSTA_CRDTO_CHRGRFRO')
+					and it.dataCreazione = (
+						select		Max(it_2.dataCreazione)
+						from		laweb4.istanzaTask it_2
+						inner join laweb4.definizioneTask dt_2
+						on			dt_2.id = it_2.definizioneTask_id
+						where		it_2.istanzaProcesso_id = it.istanzaProcesso_id
+									and it_2.dataInizioLavorazione is not null
+									 
+						)
+			group by 
+					ip.id, it.id
+
+
+	--				select * from laweb4.istanzaTask

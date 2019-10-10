@@ -1,0 +1,19 @@
+
+Giudizio Ordinario di Cognizione
+PST - Assegnazione referente pratica											rm
+PST - Creazione Procedura Legale (GENERICA) 									rm
+
+Assegnazione Procedura Legale
+PST - Creazione Procedura Legale Generica_2 									add
+PST - Associazione manuale ProceduraLegale come EntitaProcesso (Cognizione) 	add
+PST - Assegnazione referente pratica 											add
+PST - Aggiornamento Soggetti Procedura Legale 									add
+PST - Assegnazione referente pratica											modifica
+attributo Custom PL																rm
+
+Selezione Soggetti
+PST - Creazione Entità Processo Per Selezione Esecutati (Cognizione) 			add
+ANN - Entita Processo Soggetti Selezionati 	Processi							add
+
+Selezione Rapporti
+PST - Creazione Entità Processo Per Rapporto Esecutati (Cognizione)				add

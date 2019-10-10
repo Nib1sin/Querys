@@ -1,0 +1,18 @@
+
+Appello Civile
+PST - Assegnazione referente pratica											rm
+
+Assegnazione Procedura Legale Al Processo
+PST - Creazione Procedura Legale Generica_2 									add
+PST - Associazione manuale ProceduraLegale come EntitaProcesso (Appello) 		add
+PST - Assegnazione referente pratica											add
+PST - Assegnazione referente pratica											modifica
+attributo Custom PL																rm
+
+
+Seleziona Soggetto
+ANN - Entita Processo Soggetti Selezionat										add
+
+
+Selezione Rapporti
+PST - Creazione Entità Processo Per Rapporto Esecutati (Cognizione)				add

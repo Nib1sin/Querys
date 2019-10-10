@@ -1,0 +1,167 @@
+import it.sydema.laweb.domain.Enums.Entita
+import it.sydema.laweb.domain.Enums.TipoDatoCampoEntitaDerivata
+
+def referentiWF = entityManager.createQuery("""select
+    new Map(
+        ep.idEntita as procedura_id,
+        ep2.idEntita as posizione_id,
+        iat.valoreIntero as id,
+        iat.valoreStringa as nomeReferente
+     )
+    from EntitaProcesso ep, EntitaProcesso ep2
+        join ep.istanzaProcesso ip
+        join ip.istanzeTasks it
+        join it.definizioneTask dt
+        join it.istanzeAttributiTasks iat
+        join iat.attributoProcesso ap
+        
+        join ep2.istanzaProcesso ip2
+    where
+        ap.codice in ('LGLE_INCRCTO','LGLE_INCRCTO_r1','LGLE_INCRCTO_r2')
+        and ep.entita = it.sydema.laweb.domain.Enums\$Entita.PROCEDURA_LEGALE
+        and ep2.entita = it.sydema.laweb.domain.Enums\$Entita.POSIZIONE
+        and ip.id = ip2.id
+        """)
+    .resultList
+
+def referenti = []    
+def index = 0
+
+def referentiAttuali = entityManager.createQuery("""select
+    new Map(
+        ie.idEntita as procedura_id,
+        eap.idElemento as posizione_id,
+        rre.descrizione as ruolo,
+        eo.id as id,
+        eo.nomeCompleto as nome,
+        sre.dataInizioValidita as data,
+        day_diff(sre.dataInizioValidita, current_date()) as giorni
+    )
+    from
+        InfoEntita ie, ProceduraLegale pl
+        join ie.storiciReferentiEntite sre
+        join sre.ruoloReferenteEntita rre
+        join sre.elementoOrganizzativoReferente eo
+        join pl.elementiAssociatiProcedureLegali eap with eap.tipoElementoAssociatoProceduraLegale = it.sydema.laweb.domain.Enums\$TipoElementoAssociatoProceduraLegale.POSIZIONE
+    where
+        ie.entita = it.sydema.laweb.domain.Enums\$Entita.PROCEDURA_LEGALE
+        and ie.idEntita = pl.id
+        and sre.corrente = true
+        and rre.descrizione in ('Referente', 'Responsabile Ufficio Referente', 'SLE', 'SRE')""")
+    .resultList
+referentiAttuali.each
+{ it ->
+    referentiWF.each
+    { it2 ->
+        if(it.procedura_id == it2.procedura_id)
+        {
+            def copy = [:]
+            copy.putAll(it)
+            copy.id = it.id
+            referenti << copy
+        }
+    }
+        
+}
+
+def referenti2 = []
+
+def referentiBU = entityManager.createQuery("""
+    select distinct new Map(
+    	eo.id as id,
+    	eo.nomeCompleto as nome,
+    	sbu.elementoOrganizzativo.id as sbuId,
+    	eor.id as gestoreId,
+    	
+    	sbu.elementoOrganizzativo.id as				Id_Ufficio,
+        sbu.nomeCompleto as 						Ufficio
+    	
+    )
+    from ElementoOrganizzativo eo, RuoloReferenteEntita rre
+    join eo.storiciPersone sp
+    join sp.storicoBusinessUnit sbu
+    join sbu.storicoStrutturaOrganizzativa sso
+    
+    join rre.storiciReferentiEntite sre
+    join sre.elementoOrganizzativoReferente eor
+    join eo.storiciPersone spr
+    join sp.storicoBusinessUnit sbur
+    where sre.corrente = true
+        and rre.descrizione in ('Referente', 'Responsabile Ufficio Referente')
+        and sso.corrente = true
+        and sbu.id = sbur.id
+    """).resultList 
+referenti.each
+{ referente ->
+    def presente = false
+    referentiBU.each
+    { referenteBusinessUnit ->
+        if(referente.id == referenteBusinessUnit.gestoreId)
+        {
+            presente = true
+            def copy2 = [:]
+            copy2.putAll(referente)
+            copy2.id = referenteBusinessUnit.id
+            copy2.nome = referenteBusinessUnit.nome
+            
+            it.Id_Ufficio = it.Id_Ufficio
+            it.Ufficio = it.Ufficio
+            
+            referenti2 << copy2
+        }
+        
+    }
+    if(presente == false)
+        referenti2 << referente
+    
+}
+    
+// posizioni
+def posizioni = entityManager.createQuery("""select
+    new Map(
+        p.id as id,
+        p.intestazione as intestazione,
+        p.ndgControparte as ndg,
+        eo.id as mandante_id,
+        eo.nomeCompleto as mandante,
+		'Studio legale esterno' as classeSLE,
+		
+		eor.nomeCompleto as         NomeReferente_Pratica,
+        eor.id as                   IdReferente_Pratica
+		
+    )
+    from
+        Posizione p, StoricoReferenteEntita sre
+        left join p.elementoOrganizzativoMandante eo
+        
+        join p.infoEntita                       ie
+        join sre.ruoloReferenteEntita           rre
+        join sre.elementoOrganizzativoReferente eor
+        
+        where   p.dataChiusura is null
+                and sre.infoEntita.id = p.infoEntita.id
+                and sre.corrente = true
+                and rre.descrizione = 'Referente'
+        
+        
+        
+        """)
+    .resultList
+    .each 
+    { 
+        item ->
+        // integro le informazioni sui referenti
+        referenti2.each{ ref ->
+            if (ref.posizione_id == item.id)
+            { 
+                    def prefix = ref.ruolo == 'Società Recupero Esterna' ? 'sre_' :
+                        (ref.ruolo == 'Legale Esterno' || ref.ruolo == 'SLE' || ref.ruolo == 'Studio Legale Esterno Procedura' || ref.ruolo == 'Studio Legale Esterno') ? 'sle_' : 'gestore_'
+
+                    item[prefix + 'id'] = ref.id
+                    item[prefix] = ref.nome
+                    item[prefix + 'giorni'] = ref.giorni
+                    item['data'] = ref.data
+
+                }
+        }
+    }

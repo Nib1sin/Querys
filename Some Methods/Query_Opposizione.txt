@@ -1,0 +1,536 @@
+select distinct
+       POS.id as [Id Posizione],
+       POS.ndgControparte as [Ndg Posizione],
+       POS.intestazione as [Nome Completo Posizione],
+       DP.nome as [Descrizione WF],
+       DT.nome as [Desrizione Task Corrente],
+	   CASE
+			when IP.statoIstanza = 1  then 'CREATO'
+			when IP.statoIstanza = 2  then 'ATTIVO'
+			when IP.statoIstanza = 6  then 'AGGIORNATO'
+			when IP.statoIstanza = 7  then 'TERMINATO'
+			when IP.statoIstanza = 9  then 'IN_ECCEZIONE'
+			when IP.statoIstanza = 10 then 'IN_MODIFICA'
+			else ''
+	   end as [Stato WorkFlow],
+	   CONVERT(varchar(10),it.audit_modifiedDate,(103)) as [Data Aggiornamento Task Corrente],
+	   IT.id as [Id Task Corrente],
+	   CASE
+			when IT.statoIstanza = 1  then 'CREATO'
+			when IT.statoIstanza = 2  then 'ATTIVO'
+			when IT.statoIstanza = 6  then 'AGGIORNATO'
+			when IT.statoIstanza = 9  then 'IN_ECCEZIONE'
+			when IT.statoIstanza = 10 then 'IN_MODIFICA'
+			else ''
+	   end as [Stato Task Corrente],
+	   '' as [Preventivo],
+	   (Select COUNT(distinct iat.valoreStringa) from laweb4.istanzaattributotask iat where iat.istanzaTask_id = SOGGETTI.taskId) as [Numero Soggetti Anagrafici Collegati],		
+	   SUBSTRING(
+				(
+				select	distinct	
+							'; ' + iat_1.valoreStringa
+				from		laweb4.istanzaprocesso ip_1
+				inner join	laweb4.definizioneprocesso dp 
+				on			ip_1.definizioneprocesso_id = dp.id		
+				inner join	laweb4.istanzatask it
+				on			it.istanzaprocesso_id = ip_1.id
+				left join	laweb4.definizionetask dt 
+				on			dt.id = it.definizionetask_id
+				left join	laweb4.istanzaattributotask  iat_1 
+				on			iat_1.istanzaTask_id = it.id 
+				where 
+							dt.codiceIdentificativo = 'SLZNE_SGGTTI_r5'
+							and ip_1.id = IP.id
+				FOR XML PATH('')
+				)
+				,2,200000) AS [Soggetti Anagrafici Collegati],
+		CASE
+				when pos.tipologiaPosizione = 1 then (Select COUNT(distinct iat.valoreIntero) from laweb4.istanzaattributotask  iat where iat.istanzaTask_id = rapporti_wf.taskId) 
+				when pos.tipologiaPosizione = 3 then COUNT(rapporti_wf.nota) --LEN(rapporti_wf.nota) 
+				else ''
+		end as [Numero: Rapporti o Note collegati al WF],
+		CASE
+				when pos.tipologiaPosizione = 1 then	(SUBSTRING(
+																(
+																select	distinct	
+																			'; ' + r_1.CRAPPORT
+																from		laweb4.istanzaprocesso ip
+																left join	laweb4.definizioneprocesso dp 
+																on			ip.definizioneprocesso_id = dp.id
+																left join	(select * from laweb4.entitaprocesso where entita = 'POSIZIONE') ep 
+																on			ep.istanzaProcesso_id = ip.id
+																left join	laweb4.posizione POS_1 
+																on			ep.identita = pos_1.id 
+																left join	(select * from laweb4.istanzatask where (statoIstanza = 2 or statoIstanza = 6 or statoIstanza = 3) ) it 
+																on			it.istanzaprocesso_id = ip.id
+																left join	laweb4.definizionetask dt 
+																on			dt.id = it.definizionetask_id
+																left join	laweb4.istanzaattributotask  iat 
+																on			iat.istanzaTask_id = it.id 
+																left join	laweb4.rapporto r_1
+																on			r_1.posizione_id = pos_1.id
+																where 
+																			dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+																			and dt.codiceIdentificativo = 'SLZNE_RPPRTI_r4'
+																			and POS_1.id = Pos.id
+																			and r_1.id = iat.valoreIntero
+																FOR XML PATH('')
+																)
+																,2,200000))
+				when pos.tipologiaPosizione = 3 then	(SUBSTRING(
+																(		
+																select		
+																			'; ' + it.nota
+																from		laweb4.istanzaprocesso ip
+																left join	laweb4.definizioneprocesso dp 
+																on			ip.definizioneprocesso_id = dp.id
+																left join	(select * from laweb4.entitaprocesso where entita = 'POSIZIONE') ep 
+																on			ep.istanzaProcesso_id = ip.id
+																left join	laweb4.posizione POS_1 
+																on			ep.identita = pos_1.id 
+																left join	(select * from laweb4.istanzatask where (statoIstanza = 2 or statoIstanza = 6 or statoIstanza = 3) ) it 
+																on			it.istanzaprocesso_id = ip.id
+																left join	laweb4.definizionetask dt 
+																on			it.definizioneTask_id = dt.id
+																left join	laweb4.istanzaattributotask  iat 
+																on			iat.istanzaTask_id = it.id 
+																left join	laweb4.rapporto r_1
+																on			r_1.posizione_id = pos_1.id
+																where 
+																			dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+																			and dt.codiceIdentificativo = 'SLZNE_RPPRTI_r4'
+																			and POS_1.id = Pos.id
+																FOR XML PATH('')
+																)
+																,2,200000))
+				else null 
+		end AS [Rapporti o Note Collegati al Wf],
+		CONVERT(varchar(10),Opposizione_Decreto.Data_Inizio_Azione,(103)) as [Opposizione Decreto - Data Inizio Azione],
+		Opposizione_Decreto.Legale as [Opposizione Decreto - Legale Incaricato],
+		Opposizione_Decreto.valore_causa as [Opposizione Decreto - Valore di Causa],
+		Opposizione_Decreto.Ruolo as [Opposizione Decreto - Ruolo],
+		Opposizione_Decreto.Motivazione as [Opposizione Decreto - Motivazioni Della Opposizione],
+		Decreto_Da_Opporre.Ufficio_Giudiziario as [Decreto Da Opporre - Ufficio Giudiziario],
+		Decreto_Da_Opporre.Decreto_Ingiuntivo as [Decreto Da Opporre - Decreto Ingiuntivo],
+		CASE 
+			when Decreto_Da_Opporre.Decreto_Ingiuntivo_Provviso = 1 then 'Si'
+			when Decreto_Da_Opporre.Decreto_Ingiuntivo_Provviso = 0 then 'No'
+			else null
+		end as [Decreto Da Opporre - Decreto Ingiuntivo Provviso],
+		CASE 
+			when Decreto_Da_Opporre.Proporre_Domanda = 1 then 'Si'
+			when Decreto_Da_Opporre.Proporre_Domanda = 0 then 'No'
+			else null
+		end as [Decreto Da Opporre - Proporre Domanda],
+		Decreto_Da_Opporre.Valore_Riconvenzionale as [Decreto Da Opporre - Valore Riconvenzionale],
+		CASE 
+			when Notifica_Opposizione.Richiesta_Sospensione = 1 then 'Si'
+			when Notifica_Opposizione.Richiesta_Sospensione = 0 then 'No'
+			else null
+		end as [Notifica Opposizione - Richiesta Sospensione]--,
+		--Decreto_Opposto.Ufficio_Giudiziario as [Decreto Opposto - Ufficio Giudiziario]
+
+
+
+
+from		laweb4.istanzaprocesso IP
+inner join	laweb4.definizioneprocesso dp 
+on			ip.definizioneprocesso_id = dp.id
+inner join	laweb4.entitaprocesso EP 
+on			EP.istanzaprocesso_id = IP.id 
+			and EP.entita = 'POSIZIONE' 
+inner join	laweb4.posizione POS 
+on			POS.id = EP.identita
+inner join	laweb4.istanzatask IT 
+on			it.istanzaprocesso_id = ip.id 
+			and	(it.statoIstanza in (1,2,6,7,9,10))
+inner join	laweb4.definizionetask dt 
+on			dt.id = it.definizionetask_id
+left join	laweb4.istanzaattributotask  iat 
+on			iat.istanzaTask_id = it.id 
+left join	laweb4.AttributoProcesso ap 
+on			ap.id = iat.attributoprocesso_id 
+left join	laweb4.Rapporto r
+on			r.posizione_id = pos.id
+left join	(
+			select		
+						iat.id as iat_id,
+						iat.valoreStringa as soggetti,
+						it.id as taskId,
+						ip.id as ProcessoId
+			from		laweb4.istanzaprocesso ip
+			left join	laweb4.definizioneprocesso dp 
+			on			ip.definizioneprocesso_id = dp.id
+			left join	(select * from laweb4.istanzatask where (statoIstanza = 2 or statoIstanza = 6 or statoIstanza = 3) ) it 
+			on			it.istanzaprocesso_id = ip.id
+			left join	laweb4.definizionetask dt 
+			on			dt.id = it.definizionetask_id
+			left join	laweb4.istanzaattributotask  iat 
+			on			iat.istanzaTask_id = it.id 
+			where		
+						dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+						and dt.codiceIdentificativo = 'SLZNE_SGGTTI_r5'
+			) SOGGETTI
+on			SOGGETTI.ProcessoId = IP.id
+left join	(
+			select		
+						iat.valoreStringa as descrizioneRapporto,
+						iat.valoreIntero as idRapporto,
+						it.id as taskId,
+						ip.id as ProcessoId,
+						it.nota as nota
+			from		laweb4.istanzaprocesso ip
+			left join	laweb4.definizioneprocesso dp 
+			on			ip.definizioneprocesso_id = dp.id
+			left join	(select * from laweb4.istanzatask where (statoIstanza = 2 or statoIstanza = 6 or statoIstanza = 3) ) it 
+			on			it.istanzaprocesso_id = ip.id
+			left join	laweb4.definizionetask dt 
+			on			dt.id = it.definizionetask_id
+			left join	laweb4.istanzaattributotask  iat 
+			on			iat.istanzaTask_id = it.id 
+			where 
+						dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+						and dt.codiceIdentificativo = 'SLZNE_RPPRTI_r4'
+			) rapporti_wf
+on			rapporti_wf.ProcessoId = ip.id
+left join	(
+			select		
+					it.id as taskId,
+					ip.id as ProcessoId,
+					Data_Inizio_Azione.data_inizio_Azione as Data_Inizio_Azione,
+					Legale.Legale as Legale,
+					Valore_Causa.Valore_Causa as Valore_Causa,
+					Ruolo.Ruolo as Ruolo,
+					Motivazione.Motivazione as Motivazione
+			from		laweb4.istanzaprocesso ip
+			left join	laweb4.definizioneprocesso dp 
+			on			ip.definizioneprocesso_id = dp.id
+			left join	(select * from laweb4.istanzatask where (statoIstanza = 2 or statoIstanza = 6 or statoIstanza = 3) ) it 
+			on			it.istanzaprocesso_id = ip.id
+			left join	laweb4.definizionetask dt 
+			on			dt.id = it.definizionetask_id
+			left join	laweb4.istanzaattributotask  iat 
+			on			iat.istanzaTask_id = it.id
+			left join	(
+						select		
+								it.id as taskId,
+								ip.id as ProcessoId,
+								iat.valoreData as data_inizio_Azione
+						from		laweb4.istanzaprocesso IP
+						inner join	laweb4.definizioneprocesso dp 
+						on			ip.definizioneprocesso_id = dp.id
+						inner join	laweb4.istanzatask IT 
+						on			it.istanzaprocesso_id = ip.id 
+									and	(it.statoIstanza in (1,2,3,6))
+						inner join	laweb4.definizionetask dt 
+						on			dt.id = it.definizionetask_id
+						left join	laweb4.istanzaattributotask  iat 
+						on			iat.istanzaTask_id = it.id 
+						left join	laweb4.AttributoProcesso ap 
+						on			ap.id = iat.attributoprocesso_id 
+						where
+									dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+									and ap.codice in ('_DATA_INZO_AZNE')
+						)Data_Inizio_Azione
+			on			Data_Inizio_Azione.ProcessoId = IP.id
+			left join	(
+						select		
+								it.id as taskId,
+								ip.id as ProcessoId,
+								iat.valoreStringa as Legale
+						from		laweb4.istanzaprocesso IP
+						inner join	laweb4.definizioneprocesso dp 
+						on			ip.definizioneprocesso_id = dp.id
+						inner join	laweb4.istanzatask IT 
+						on			it.istanzaprocesso_id = ip.id 
+									and	(it.statoIstanza in (1,2,3,6))
+						inner join	laweb4.definizionetask dt 
+						on			dt.id = it.definizionetask_id
+						left join	laweb4.istanzaattributotask  iat 
+						on			iat.istanzaTask_id = it.id 
+						left join	laweb4.AttributoProcesso ap 
+						on			ap.id = iat.attributoprocesso_id 
+						where
+									dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+									and ap.codice in ('LGLE_INCRCTO')
+						)Legale
+			on			Legale.ProcessoId = IP.id
+			left join	(
+						select		
+								it.id as taskId,
+								ip.id as ProcessoId,
+								iat.valoreDecimale as Valore_Causa
+						from		laweb4.istanzaprocesso IP
+						inner join	laweb4.definizioneprocesso dp 
+						on			ip.definizioneprocesso_id = dp.id
+						inner join	laweb4.istanzatask IT 
+						on			it.istanzaprocesso_id = ip.id 
+									and	(it.statoIstanza in (1,2,3,6))
+						inner join	laweb4.definizionetask dt 
+						on			dt.id = it.definizionetask_id
+						left join	laweb4.istanzaattributotask  iat 
+						on			iat.istanzaTask_id = it.id 
+						left join	laweb4.AttributoProcesso ap 
+						on			ap.id = iat.attributoprocesso_id 
+						where
+									dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+									and ap.codice in ('VLRE_CSA')
+						)Valore_Causa
+			on			Valore_Causa.ProcessoId = IP.id
+			left join	(
+						select		
+								it.id as taskId,
+								ip.id as ProcessoId,
+								iat.valoreStringa as Ruolo
+						from		laweb4.istanzaprocesso IP
+						inner join	laweb4.definizioneprocesso dp 
+						on			ip.definizioneprocesso_id = dp.id
+						inner join	laweb4.istanzatask IT 
+						on			it.istanzaprocesso_id = ip.id 
+									and	(it.statoIstanza in (1,2,3,6))
+						inner join	laweb4.definizionetask dt 
+						on			dt.id = it.definizionetask_id
+						left join	laweb4.istanzaattributotask  iat 
+						on			iat.istanzaTask_id = it.id 
+						left join	laweb4.AttributoProcesso ap 
+						on			ap.id = iat.attributoprocesso_id 
+						where
+									dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+									and ap.codice in ('RLO')
+						)Ruolo
+			on			Ruolo.ProcessoId = IP.id
+			left join	(
+						select		
+								it.id as taskId,
+								ip.id as ProcessoId,
+								iat.valoreTesto as Motivazione
+						from		laweb4.istanzaprocesso IP
+						inner join	laweb4.definizioneprocesso dp 
+						on			ip.definizioneprocesso_id = dp.id
+						inner join	laweb4.istanzatask IT 
+						on			it.istanzaprocesso_id = ip.id 
+									and	(it.statoIstanza in (1,2,3,6))
+						inner join	laweb4.definizionetask dt 
+						on			dt.id = it.definizionetask_id
+						left join	laweb4.istanzaattributotask  iat 
+						on			iat.istanzaTask_id = it.id 
+						left join	laweb4.AttributoProcesso ap 
+						on			ap.id = iat.attributoprocesso_id 
+						where
+									dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+									and ap.codice in ('MTVZNI_OPPSZNE')
+						)Motivazione
+			on			Motivazione.ProcessoId = IP.id
+			) Opposizione_Decreto
+on			Opposizione_Decreto.ProcessoId = IP.id	
+left join	(
+			select		
+					it.id as taskId,
+					ip.id as ProcessoId,
+					Ufficio_Giudiziario.Ufficio as Ufficio_Giudiziario,
+					Decreto_Ingiuntivo.Decreto_Ingiuntivo as Decreto_Ingiuntivo,
+					Decreto_Ingiuntivo_Provviso.Decreto_Ingiuntivo_Provviso as Decreto_Ingiuntivo_Provviso,
+					Proporre_Domanda.Proporre_Domanda as Proporre_Domanda,
+					Valore_Riconvenzionale.Valore_Riconvenzionale as Valore_Riconvenzionale
+					
+			from		laweb4.istanzaprocesso ip
+			left join	laweb4.definizioneprocesso dp 
+			on			ip.definizioneprocesso_id = dp.id
+			left join	(select * from laweb4.istanzatask where (statoIstanza = 2 or statoIstanza = 6 or statoIstanza = 3) ) it 
+			on			it.istanzaprocesso_id = ip.id
+			left join	laweb4.definizionetask dt 
+			on			dt.id = it.definizionetask_id
+			left join	laweb4.istanzaattributotask  iat 
+			on			iat.istanzaTask_id = it.id
+			left join	(
+						select		
+								it.id as taskId,
+								ip.id as ProcessoId,
+								iat.valoreStringa as Ufficio
+						from		laweb4.istanzaprocesso IP
+						inner join	laweb4.definizioneprocesso dp 
+						on			ip.definizioneprocesso_id = dp.id
+						inner join	laweb4.istanzatask IT 
+						on			it.istanzaprocesso_id = ip.id 
+									and	(it.statoIstanza in (1,2,3,6))
+						inner join	laweb4.definizionetask dt 
+						on			dt.id = it.definizionetask_id
+						left join	laweb4.istanzaattributotask  iat 
+						on			iat.istanzaTask_id = it.id 
+						left join	laweb4.AttributoProcesso ap 
+						on			ap.id = iat.attributoprocesso_id 
+						where
+									dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+									and ap.codice in ('UFFCO_GDZRO')
+						)Ufficio_Giudiziario
+			on			Ufficio_Giudiziario.ProcessoId = IP.id
+			left join	(
+						select		
+								it.id as taskId,
+								ip.id as ProcessoId,
+								iat.valoreStringa as Decreto_Ingiuntivo
+						from		laweb4.istanzaprocesso IP
+						inner join	laweb4.definizioneprocesso dp 
+						on			ip.definizioneprocesso_id = dp.id
+						inner join	laweb4.istanzatask IT 
+						on			it.istanzaprocesso_id = ip.id 
+									and	(it.statoIstanza in (1,2,3,6))
+						inner join	laweb4.definizionetask dt 
+						on			dt.id = it.definizionetask_id
+						left join	laweb4.istanzaattributotask  iat 
+						on			iat.istanzaTask_id = it.id 
+						left join	laweb4.AttributoProcesso ap 
+						on			ap.id = iat.attributoprocesso_id 
+						where
+									dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+									and ap.codice in ('NMRO_DCRTO_INGNTVO')
+						)Decreto_Ingiuntivo
+			on			Decreto_Ingiuntivo.ProcessoId = IP.id
+			left join	(
+						select		
+								it.id as taskId,
+								ip.id as ProcessoId,
+								iat.valoreBooleano as Decreto_Ingiuntivo_Provviso
+						from		laweb4.istanzaprocesso IP
+						inner join	laweb4.definizioneprocesso dp 
+						on			ip.definizioneprocesso_id = dp.id
+						inner join	laweb4.istanzatask IT 
+						on			it.istanzaprocesso_id = ip.id 
+									and	(it.statoIstanza in (1,2,3,6))
+						inner join	laweb4.definizionetask dt 
+						on			dt.id = it.definizionetask_id
+						left join	laweb4.istanzaattributotask  iat 
+						on			iat.istanzaTask_id = it.id 
+						left join	laweb4.AttributoProcesso ap 
+						on			ap.id = iat.attributoprocesso_id 
+						where
+									dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+									and ap.codice in ('DCRTO_INGNTVO_PRVVSRMNTE_ESCTVO')
+						)Decreto_Ingiuntivo_Provviso
+			on			Decreto_Ingiuntivo_Provviso.ProcessoId = IP.id
+			left join	(
+						select		
+								it.id as taskId,
+								ip.id as ProcessoId,
+								iat.valoreBooleano as Proporre_Domanda
+						from		laweb4.istanzaprocesso IP
+						inner join	laweb4.definizioneprocesso dp 
+						on			ip.definizioneprocesso_id = dp.id
+						inner join	laweb4.istanzatask IT 
+						on			it.istanzaprocesso_id = ip.id 
+									and	(it.statoIstanza in (1,2,3,6))
+						inner join	laweb4.definizionetask dt 
+						on			dt.id = it.definizionetask_id
+						left join	laweb4.istanzaattributotask  iat 
+						on			iat.istanzaTask_id = it.id 
+						left join	laweb4.AttributoProcesso ap 
+						on			ap.id = iat.attributoprocesso_id 
+						where
+									dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+									and ap.codice in ('DMNDA_RCNVNZNLE')
+						)Proporre_Domanda
+			on			Proporre_Domanda.ProcessoId = IP.id
+			left join	(
+						select		
+								it.id as taskId,
+								ip.id as ProcessoId,
+								iat.valoreDecimale as Valore_Riconvenzionale
+						from		laweb4.istanzaprocesso IP
+						inner join	laweb4.definizioneprocesso dp 
+						on			ip.definizioneprocesso_id = dp.id
+						inner join	laweb4.istanzatask IT 
+						on			it.istanzaprocesso_id = ip.id 
+									and	(it.statoIstanza in (1,2,3,6))
+						inner join	laweb4.definizionetask dt 
+						on			dt.id = it.definizionetask_id
+						left join	laweb4.istanzaattributotask  iat 
+						on			iat.istanzaTask_id = it.id 
+						left join	laweb4.AttributoProcesso ap 
+						on			ap.id = iat.attributoprocesso_id 
+						where
+									dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+									and ap.codice in ('VLRE_RCNVNZNLE')
+						)Valore_Riconvenzionale
+			on			Valore_Riconvenzionale.ProcessoId = IP.id			
+			) Decreto_Da_Opporre
+on			Decreto_Da_Opporre.ProcessoId = IP.id					
+left join	(
+            select              
+					it.id as taskId,
+                    ip.id as ProcessoId,
+                    iat.valoreBooleano  as Richiesta_Sospensione    
+            from        laweb4.istanzaProcesso ip
+            left join   laweb4.definizioneProcesso dp
+            on          ip.definizioneProcesso_id = dp.id
+            left join	laweb4.istanzatask IT 
+			on			it.istanzaprocesso_id = ip.id 
+						and	(it.statoIstanza in (1,2,3,6))
+            left join   laweb4.definizioneTask dt
+            on          dt.id = it.definizioneTask_id
+            left join   laweb4.istanzaAttributoTask iat
+            on          iat.istanzaTask_id = it.id
+            left join   laweb4.attributoProcesso ap
+            on          ap.id = iat.attributoProcesso_id
+            where        
+                                dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+                                and dt.codiceIdentificativo = 'NTFCA_OPPSZNE'
+                                and ap.codice in ('RCHSTA_SSPNSNE_ESCTRTA')
+            ) Notifica_Opposizione
+on          Notifica_Opposizione.ProcessoId = ip.id
+
+
+left join	(
+			select		
+					it.id as taskId,
+					ip.id as ProcessoId,
+					Ufficio_Giudiziario.Ufficio_Giudiziario as Ufficio_Giudiziario
+					
+			from		laweb4.istanzaprocesso ip
+			left join	laweb4.definizioneprocesso dp 
+			on			ip.definizioneprocesso_id = dp.id
+			left join	(select * from laweb4.istanzatask where (statoIstanza = 2 or statoIstanza = 6 or statoIstanza = 3) ) it 
+			on			it.istanzaprocesso_id = ip.id
+			left join	laweb4.definizionetask dt 
+			on			dt.id = it.definizionetask_id
+			left join	laweb4.istanzaattributotask  iat 
+			on			iat.istanzaTask_id = it.id
+			
+			left join	(
+						select		
+								it.id as taskId,
+								ip.id as ProcessoId,
+								iat.valoreStringa as Ufficio_Giudiziario
+						from		laweb4.istanzaprocesso IP
+						inner join	laweb4.definizioneprocesso dp 
+						on			ip.definizioneprocesso_id = dp.id
+						inner join	laweb4.istanzatask IT 
+						on			it.istanzaprocesso_id = ip.id 
+									and	(it.statoIstanza in (1,2,3,6))
+						inner join	laweb4.definizionetask dt 
+						on			dt.id = it.definizionetask_id
+						left join	laweb4.istanzaattributotask  iat 
+						on			iat.istanzaTask_id = it.id 
+						left join	laweb4.AttributoProcesso ap 
+						on			ap.id = iat.attributoprocesso_id 
+						where
+									dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+									and ap.codice in ('UFFCO_GDZRO')
+						)Ufficio_Giudiziario
+			on			Ufficio_Giudiziario.ProcessoId = IP.id
+			
+			
+			
+			) Decreto_Opposto
+on			Decreto_Opposto.ProcessoId = IP.id			
+
+
+
+
+
+
+where dp.descrizione = 'Opposizione a Decreto Ingiuntivo'
+group by
+pos.id, pos.ndgControparte, pos.intestazione, dp.nome, dt.nome, ip.statoIstanza, it.audit_modifiedDate, it.id, it.statoIstanza, SOGGETTI.taskId, ip.id, rapporti_wf.taskId, pos.tipologiaPosizione, rapporti_wf.nota, 
+Opposizione_Decreto.Data_Inizio_Azione,Opposizione_Decreto.Legale, Opposizione_Decreto.Valore_Causa, Opposizione_Decreto.Ruolo, Opposizione_Decreto.Motivazione, 
+Decreto_Da_Opporre.Ufficio_Giudiziario, Decreto_Da_Opporre.Decreto_Ingiuntivo, Decreto_Da_Opporre.Decreto_Ingiuntivo_Provviso, Decreto_Da_Opporre.Proporre_Domanda, Decreto_Da_Opporre.Valore_Riconvenzionale,
+Notifica_Opposizione.Richiesta_Sospensione, Decreto_Opposto.Ufficio_Giudiziario

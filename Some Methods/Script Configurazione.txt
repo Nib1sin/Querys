@@ -1,0 +1,43 @@
+def q = entityManager.createQuery("""
+select  
+		dt.id as id,
+        dt.opzioni as opzioni
+from    DefinizioneProcesso dp
+join    dp.definizioniTasks dt
+where
+        dp.nome='Esecuzione Immobiliare'
+        and dt.codiceIdentificativo = 'SLZNE_SGGTTI_r11'
+""").resultList
+//return q.toString()
+
+def abc = []
+
+q.each{
+	def query = first(entityManager.createQuery("""
+		select  dt
+		from	DefinizioneTask dt
+		where	dt.id =${it[0]} 
+	""").resultList)
+	
+	
+	//throw new Exception("Query: " + query)
+	
+	if(it[1] != null){
+		Long a = it[1]
+		Long bin = a &= ~( (1<<2) | (1<<4) )
+		abc << bin
+		//throw new Exception ("Bin : " + bin)
+	
+		if(query != null){
+			//throw new Exception ("Query: " + query.opzioni.class)
+			query.opzioni = bin
+			entityManager.merge(query)
+			entityManager.flush()
+		} 
+		
+	
+	} 
+}
+
+
+abc.toString()

@@ -1,0 +1,867 @@
+import it.sydema.laweb.services.ReportService.SorgenteDati
+import it.sydema.laweb.domain.Enums
+import it.sydema.laweb.domain.Enums.TipoRapportoSyges
+import it.sydema.laweb.domain.Enums.TipoPrevisioneSyges
+import it.sydema.laweb.services.ContabilitaSygesService
+import it.sydema.laweb.services.PPTService
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource
+import it.sydema.laweb.domain.Enums.Entita
+
+//recupero del codiceIstituto 
+def idEntita = 1561//context.findEntities(Entita.POSIZIONE)
+//throw new Exception ("idEntita :" + idEntita)
+
+def codiceIstituto = entityManager.createQuery("""
+    	    select p.codiceIstituto
+    	    from Posizione p
+    	    where p.id = :idEntita""").setParameter("idEntita",idEntita).singleResult
+
+File initialFile = null
+    	    
+if(codiceIstituto == 53 || codiceIstituto == 43){
+    
+    initialFile = new File("/opt/laweb/laweb4/storage/images/logo_desio.jpg");
+}
+else{
+    initialFile = new File("/opt/laweb/laweb4/storage/images/logo_spoleto.jpg");
+}
+
+InputStream targetStream = new FileInputStream(initialFile);
+
+//desio 53 || 43
+//spoleto 19
+
+return [
+    "logo":targetStream,
+    "sorgenteDati":SorgenteDati.DATASOURCE,
+    "dataSource": new JRBeanCollectionDataSource(createBeanList(idEntita))
+    ]
+
+
+def createBeanList(posizione_id){
+    
+    def service = context.getBean(ContabilitaSygesService.class) //estrazioneRapporti
+    
+    def formattazioneDate = 'dd/MM/yyyy'
+    
+    def totaleSintesi = []
+    def totalePrevisioniPerdita = []
+    def totalePrevisioniRecupero = []
+    def passaggioPerdita = []
+    def sintesi = []
+    def previsioni = []
+    def gestoreInterno = []
+    
+    //recupero dei dati della posizione
+    def posizione = entityManager.createQuery("""
+    	    select new Map(
+    	        p.intestazione as intestazionePosizione,
+    	        p.ndgControparte as ndgPosizione,
+    	        p.dataApertura as dataApertura,
+    	        p.dataChiusura as dataChiusura,
+    	        sdp.descrizione as statoPratica,
+    	        p.codicePratica as codiceSofferenza,
+    	        sdp.descrizione as statoPosizione,
+    	        eofp.nomeCompleto as filialePosizione,
+    	        eofp.id as idFiliale
+    	    )
+    	    from Posizione p
+    	    join p.elementoOrganizzativoFilialePrevalente eofp
+    	    left join p.storicoStatoDeterioramentoPosizioneCorrente ssdpc
+    	    left join ssdpc.statoDeterioramentoPosizione sdp
+    	    where p.id = :posizione_id""").setParameter('posizione_id', posizione_id).singleResult
+    
+    //recupero del contatto_id del soggettoAnagrafico associato alla posizione	
+    def soggettoAnagraficoPosizione = entityManager.createQuery("""
+    	    select new Map(
+    	        sa.id as contatto_id,
+    	        sa.dataNascita as dataNascita,
+    	        sa.partitaIva as partitaIva,
+    	        sa.dataIscrizioneCCIAA as dataIscrizione,
+    	        sa.codiceFiscale as codiceFiscale
+    	    )
+    		from Posizione p
+    		inner join p.elementoOrganizzativoMandante eom
+    		left join p.soggettoAnagraficoControparte sa
+    		left join p.elementoOrganizzativoFilialePrevalente fil
+    		left join p.storicoStatoDeterioramentoPosizioneCorrente ssdpc
+    		left join ssdpc.statoDeterioramentoPosizione sdp
+    		where p.id = :posizione_id""").setParameter('posizione_id', posizione_id).singleResult
+    		
+    //recupero del luogo associato al soggettoAnagrafico della posizione		
+    def luogoPosizione = entityManager.createQuery("""
+    	    select new map(
+    		    l.indirizzo as indirizzo,
+    			l.cap as cap,
+    			l.localita as localita,
+    			n.descrizione as nazione,
+    			ec.descrizione as comune,
+    			l.contatto.id as id_contatto
+    		) 
+    		from Luogo l
+    		left join l.elementoGeografiaComune ec
+    		left join l.elementoGeografiaProvincia ep
+    		left join l.nazione n
+    		left join l.elementoOrganizzativoValidatore eo
+    		where l.contatto.id = :contattoPosizione_id""").setParameter('contattoPosizione_id', soggettoAnagraficoPosizione.contatto_id).singleResult
+    		
+    //recupero del gestore interno della posizione (COLLABORATORE_INTERNO)
+    gestoreInterno = first(entityManager.createQuery("""
+    	select new Map(
+    	    eor.nomeCompleto as elementoOrganizzativoReferente,
+    	    eor.id as id
+    	)
+    	from StoricoReferenteEntita sr
+    	join sr.elementoOrganizzativoReferente eor
+    	join sr.infoEntita ie
+    	left join sr.ruoloReferenteEntita rre
+    	where ie.idEntita = :posizione_id
+    	and ie.entita = it.sydema.laweb.domain.Enums\$Entita.POSIZIONE
+    	and rre.classeElementoOrganizzativo = it.sydema.laweb.domain.Enums\$ClasseElementoOrganizzativo.COLLABORATORE_INTERNO
+    	and sr.corrente = true
+    	""").setParameter('posizione_id', posizione_id).resultList)
+    	
+    	if(gestoreInterno == null){
+    	    gestoreInterno = first(entityManager.createQuery("""
+    	        select new Map(
+    	           eor.nomeCompleto as elementoOrganizzativoReferente,
+    	           eor.id as id
+    	        )
+    	        from StoricoReferenteEntita sr
+    	        join sr.elementoOrganizzativoReferente eor
+    	        join sr.infoEntita ie
+    	        left join sr.ruoloReferenteEntita rre
+    	        where ie.idEntita = :posizione_id
+    	        and ie.entita = it.sydema.laweb.domain.Enums\$Entita.POSIZIONE
+    	        and rre.descrizione = 'Ufficio Contenzioso'
+    	        and sr.corrente = true""").setParameter('posizione_id', posizione_id).resultList)  
+    	}
+    
+    //recupero del legale esterno della posizione (SLE)	
+    def legaleEsterno = first(entityManager.createQuery("""
+        select new Map(
+    	    eor.nomeCompleto as elementoOrganizzativoReferente,
+    	    eor.id as id
+    	)
+    	from StoricoReferenteEntita sr
+    	join sr.elementoOrganizzativoReferente eor
+    	join sr.infoEntita ie
+    	left join sr.ruoloReferenteEntita rre
+    	where ie.idEntita = :posizione_id
+    	and ie.entita = it.sydema.laweb.domain.Enums\$Entita.POSIZIONE
+    	and rre.classeElementoOrganizzativo = it.sydema.laweb.domain.Enums\$ClasseElementoOrganizzativo.SLE
+    	and sr.corrente = true
+    	""").setParameter('posizione_id', posizione_id).resultList)
+    	
+    //recupero del gestore esterno della posizione (COLLABORATORE_ESTERNO)
+    def gestoreEsterno = first(entityManager.createQuery("""
+        select new Map(
+    	    eor.nomeCompleto as elementoOrganizzativoReferente,
+    	    eor.id as id
+    	)
+    	from StoricoReferenteEntita sr
+    	join sr.elementoOrganizzativoReferente eor
+    	join sr.infoEntita ie
+    	left join sr.ruoloReferenteEntita rre
+    	where ie.idEntita = :posizione_id
+    	and ie.entita = it.sydema.laweb.domain.Enums\$Entita.POSIZIONE
+    	and rre.classeElementoOrganizzativo = it.sydema.laweb.domain.Enums\$ClasseElementoOrganizzativo.COLLABORATORE_ESTERNO
+    	and sr.corrente = true""").setParameter('posizione_id', posizione_id).resultList)
+
+    //recupero di tutte le garanzie associate alla posizione (IPOTECARIA, PERSONALE, TUTTE TRANNE IP E PER)
+    def garanzieIpotecariePosizione = entityManager.createQuery("""
+	    select distinct new Map(
+	        g.id as id,
+			COALESCE(tg.descrizione,'') as descrizione,
+			COALESCE(g.valoreNominale,0.00) as valore,
+			COALESCE(c.nomeCompleto,'') as garante,
+			COALESCE(vim.valoreComplessivo,0.00) as perizia,
+			COALESCE(sa_eo.ndg, '') as ndg
+		)
+		from Garanzia g, SoggettoAnagrafico sa
+		left join sa.soggettiAnagrafici_ElementiOrganizzativi sa_eo
+	    left join g.garanzieIpotecarie_Immobili gii
+	    left join gii.datiImmobile di
+	    left join di.valutazioniImmobili vi
+	    left join vi.valoriImmobili vim
+	    left join g.garanzieIpotecarie_ProprietaImmobili gipi
+	    left join gipi.proprietaImmobile pi
+	    left join pi.contattoIntestatarioImmobile c
+	    left join g.tipoGaranzia tg
+		where
+		c.id = sa.id
+		and g.classeGaranzia = it.sydema.laweb.domain.Enums\$ClasseGaranzia.IPOTECARIA 
+		and g.posizione.id = :posizione_id""").setParameter('posizione_id', posizione_id).resultList
+		
+		
+	def garanziePersonaliPosizione = entityManager.createQuery("""
+	    select new Map(
+	        g.id as id,
+			COALESCE(tg.descrizione,'') as descrizionePersonali,
+			COALESCE(g.valoreNominale,0.00) as valorePersonali,
+			COALESCE(sa.nomeCompleto,'') as garantePersonali,
+			COALESCE(sa_eo.ndg,'') as ndgPersonali
+		)
+		from Garanzia g
+		left join g.garanzie_SoggettiAnagrafici gsa
+		left join gsa.soggettoAnagrafico sa
+		left join sa.soggettiAnagrafici_ElementiOrganizzativi sa_eo
+		left join sa_eo.elementoOrganizzativoMandante eom
+		left join g.tipoGaranzia tg
+		where
+		g.classeGaranzia = it.sydema.laweb.domain.Enums\$ClasseGaranzia.PERSONALE 
+		and g.posizione.id = :posizione_id""").setParameter('posizione_id', posizione_id).resultList
+		
+	def altreGaranziePosizione = entityManager.createQuery("""
+	    select new Map(
+	        g.id as id,
+			tg.descrizione as tipoGaranzia_descrizione,
+			g.valoreNominale as valoreNominale,
+			sa.nomeCompleto as garante
+		)
+		from Garanzia g
+		left join g.garanzie_SoggettiAnagrafici gsa
+		left join gsa.soggettoAnagrafico sa
+		left join sa.soggettiAnagrafici_ElementiOrganizzativi sa_eo
+		left join sa_eo.elementoOrganizzativoMandante eom
+		left join g.tipoGaranzia tg
+		where
+		g.classeGaranzia not in (1,2)
+		and g.posizione.id = :posizione_id""").setParameter('posizione_id', posizione_id).resultList
+		
+	//recupero dei rapporti da syges
+	def rapportoPosizione = service.rapportiPerPosizione(posizione_id)
+	
+	//situazione contabile posizione
+	def capitale = 0.00
+    def interessi = 0.00
+    def interessiDiMora = 0.00
+    def spese = 0.00
+    
+	totaleSintesi = service.situazioneRapporti(rapportoPosizione.id)
+	
+	totaleSintesi.each{ k,v->
+	    if(k == TipoRapportoSyges.CONTABILE){
+	        capitale = v.capitale
+	        interessi = v.interessi
+	        interessiDiMora = v.interessiDiMora
+	        spese = v.spese
+	    }
+    }
+    
+    def cassaPerdita = 0.00
+    def firmaPerdita = 0.00
+    def interessiPerdita = 0.00
+		
+    totalePrevisioni = service.previsioniRapporti(rapportoPosizione.id)
+    
+	totalePrevisioni.each{ k,v->
+	    if(k == TipoPrevisioneSyges.PERDITA){
+            totaleP = v.capitaleCassa + v.capitaleFirma + v.interessi
+            cassaPerdita = v.capitaleCassa
+            firmaPerdita = v.capitaleFirma
+            interessiPerdita = v.interessi
+	    }
+    }
+    
+    def cassaRecupero = 0.00
+    def firmaRecupero = 0.00
+    def interessiRecupero = 0.00
+		
+    totalePrevisioni = service.previsioniRapporti(rapportoPosizione.id)
+    
+	totalePrevisioni.each{ k,v->
+	    if(k == TipoPrevisioneSyges.RECUPERO){
+            cassaRecupero = v.capitaleCassa != null ? v.capitaleCassa : 0
+            firmaRecupero = v.capitaleFirma != null ? v.capitaleFirma : 0
+            interessiRecupero = v.interessi != null ? v.interessi : 0
+	    }
+    }
+    
+    def interessiAddebitati = entityManager.createQuery("""
+	    select SUM(rs.saldoInteressiAddebitati) as interessiAddebitati
+		from RapportoSyges rs
+		where rs.id in (:rapportoPosizione)""").setParameter('rapportoPosizione', rapportoPosizione.id).singleResult
+		
+		
+	passaggioPerdita = service.evidenzeRapporti(rapportoPosizione.id)
+	
+	//recupero degli immobili associati alla posizione (TUTTI)
+	def id_immobili = []
+	def id_proprieta = []
+	
+
+    def q = entityManager.createNamedQuery("SituazioneImmobiliare.situazioneImmobiliarePosizioneGaranziePosizione").setParameter("posizione_id", posizione_id);
+	for (Object[] element : (List<Object[]>)q.getResultList()){
+		if(element[4] != null && id_immobili.contains(element[4]) == false)
+			id_immobili.add((Integer)element[4]);
+		if(element[3] != null && id_proprieta.contains(element[3]) == false)
+			id_proprieta.add((Integer)element[3]);
+	}
+	
+	
+	def immobili = []
+	
+	def unitaImmobili = []
+	
+	if(id_immobili.size()>0){
+		// #### estrarre i campi singoli e non l'entità Immobile
+	    def immobile_posizione = entityManager.createQuery("""
+    	    select new Map(
+    	        i.id as id,
+			    COALESCE(i.descrizione,'') as descrizioneImmobile, 
+				COALESCE(egc.descrizione,'') as nomeComuneImmobile,
+			    COALESCE(vim.valoreComplessivo,0.00) as valoreComplessivo,
+			    COALESCE(i.foglio, '') as foglio,
+			    COALESCE(i.mappale_particella, '') as mappale,
+			    COALESCE(i.subalterno,'') as subalterno
+			 )
+ 		    from Immobile i
+ 		    left join i.valutazioniImmobili vi
+ 		    left join i.elementoGeografiaComune egc
+ 		    left join vi.valoriImmobili vim
+            left join i.destinazioneUsoImmobile dui
+            left join i.tipologiaImmobile ti
+            left join i.statoOccupazioneImmobile soi
+            left join i.classeEnergeticaImmobile cei
+ 		    where i.id in (:id)""").setParameter('id', id_immobili).resultList
+ 		    
+ 		    immobile_posizione.each{
+                def proprieta = []
+			    proprieta_immobili = entityManager.createQuery("""
+     		        select new Map(
+						COALESCE(saeo.ndg,'') as ndg,
+    			        COALESCE(c.nomeCompleto,'') as intestatarioProprieta,
+    			        COALESCE(pi.tipoProprietaImmobile,'') as dirittiReali,
+    			        COALESCE(pi.quotaPossesso,0.00) as quotaDiPossesso
+    			    )
+    			    from ProprietaImmobile pi
+                    join pi.datiImmobile di
+	                join pi.contattoIntestatarioImmobile c
+	                join c.soggettiAnagrafici_ElementiOrganizzativi saeo
+    			    where di.id = :id""").setParameter('id', it.id).resultList
+    			    
+    			proprieta_immobili.each{
+    			    def tipoProprieta = ''
+    			    if(it.dirittiReali == it.sydema.laweb.domain.Enums.TipoProprietaImmobile.NON_ASSEGNATO){
+    			        tipoProprieta = 'Non assegnato'
+    			    }
+    			    if(it.dirittiReali == it.sydema.laweb.domain.Enums.TipoProprietaImmobile.PIENA_PROPRIETA){
+    			        tipoProprieta = 'Piena proprietà'
+    			    }
+    			    if(it.dirittiReali == it.sydema.laweb.domain.Enums.TipoProprietaImmobile.NUDA_PROPRIETA){
+    			        tipoProprieta = 'Nuda proprietà'
+    			    }
+    			    if(it.dirittiReali == it.sydema.laweb.domain.Enums.TipoProprietaImmobile.USUFRUTTO){
+    			        tipoProprieta = 'Usufrutto'
+    			    }
+    			     if(it.dirittiReali == it.sydema.laweb.domain.Enums.TipoProprietaImmobile.DI_SUPERFICIE){
+    			        tipoProprieta = 'Di superficie'
+    			    }
+    			    if(it.dirittiReali == it.sydema.laweb.domain.Enums.TipoProprietaImmobile.PROPRIETA_SUPERFICIALE){
+    			        tipoProprieta = 'Proprietà superficiale'
+    			    }
+    			    if(it.dirittiReali == it.sydema.laweb.domain.Enums.TipoProprietaImmobile.ABITAZIONE){
+    			        tipoProprieta = 'Abitazione'
+    			    }
+    			    if(it.dirittiReali == it.sydema.laweb.domain.Enums.TipoProprietaImmobile.USUFRUTTO_SU_PROPRIETA_SUPERFICIARIA){
+    			        tipoProprieta = 'Usufrutto su proprietà superficiaria'
+    			    }
+    			    
+    			    
+    			    proprieta << [
+    			        'ndg': it.ndg,
+    			        'intestatarioProprieta': it.intestatarioProprieta,
+    			        'dirittiReali': tipoProprieta,
+    			        'quotaDiPossesso': it.quotaDiPossesso
+    			    ]
+    			    
+    			}
+    			    
+
+        
+	            immobili << [
+    	            'descrizioneImmobile': it.descrizioneImmobile,
+    	            'comuneImmobile': it.nomeComuneImmobile,
+    	            'valoreStimatoImmobile': it.valoreComplessivo,
+    	            'foglio': it.foglio,
+    	            'mappale': it.mappale,
+    	            'subalterno': it.subalterno,
+    	            'proprietaImmobileDataSet': proprieta
+	            ]
+ 		}
+    		
+	}
+	
+	def tipologiaProceduraLegale = [
+	    'Decreto Ingiuntivo',
+	    'Decreto ingiuntivo',
+	    'Precetto',
+	    'Atto di precetto',
+	    'Opposizione A Decreto Ingiuntivo',
+	    'Opposizione a decreto ingiuntivo – I grado - I fase',                                              
+        'Opposizione a decreto ingiuntivo – I grado - II fase',                                                
+        'Opposizione a decreto ingiuntivo – I grado - III fase',                                               
+        'Opposizione a decreto ingiuntivo – II grado - I fase',                                                
+        'Opposizione a decreto ingiuntivo – II grado - II fase',
+        'Iscrizione Ipoteca Giudiziale Generica',
+        'Iscrizione Ipoteca Giudiziale da D.I.',
+        'Iscrizione di ipoteca giudiziale',
+        'Esecuzione Immobiliare',
+        'Esecuzione immobiliare',
+        'Esecuzione immobiliare -I fase',
+        'Esecuzione immobiliare -II fase',
+        'Esecuzione immobiliare -III fase',
+        'Intervento in Esecuzione Immobiliare',
+        'Intervento in esecuzione immobiliare',
+        'Intervento in Esecuzione Immobiliare - I fase',
+        'Intervento in Esecuzione Immobiliare - II fase',
+        'Ammissione Al Passivo Fallimentare Ex Art. 101 L.F.',
+        'Ammissione Al Passivo Fallimentare Ex Art. 93 L.F.',
+        'Ammissione al passivo ordinaria ex art. 93 L.F.',                                                 
+        'Ammissione al passivo fallimentare tardiva ex art. 101 L.F.'
+	]
+
+	
+	def procedure_legali = entityManager.createQuery("""
+	    select new Map(
+	        pl.id as id,
+	        tpl.descrizione as descrizione
+	    )
+		from ProceduraLegale pl
+		join pl.elementiAssociatiProcedureLegali eapl with 
+		eapl.tipoElementoAssociatoProceduraLegale = it.sydema.laweb.domain.Enums\$TipoElementoAssociatoProceduraLegale.POSIZIONE
+		join pl.tipoProceduraLegale tpl
+		left join tpl.naturaProceduraLegale npl
+		left join pl.elementoOrganizzativoTribunale tribunale
+ 		where eapl.idElemento = :posizione_id
+ 		and tpl.descrizione in :tipologiaProceduraLegale
+ 		""").setParameter('posizione_id', posizione_id).setParameter('tipologiaProceduraLegale',tipologiaProceduraLegale).resultList
+ 		
+
+ 		
+ 	def attributiDecretoIngiuntivo = []
+    def attributiAttoDiPrecetto = []	
+    def attributiOpposizioneDecretoIngiuntivo = []
+    def attributiIpotecaGiudiziale = []
+    def attributiEsecuzioneImmobiliare = []
+    def attributiInterventoInEsecuzione = []
+    def attributiAmmissioneAlPassivo = []
+    
+ 	/* Recupero tutti gli ID delle procedure legali e successivamente cerco gli attributi con codice uguale */
+ 	if(procedure_legali != null){
+     	procedure_legali.each{
+     	    
+     	    def attributo = []
+     	    
+     	    it.descrizione = it.descrizione.trim()
+     	    
+     	    if(it.descrizione == 'Decreto Ingiuntivo' || it.descrizione == 'Decreto ingiuntivo'){
+     	        attributo = entityManager.createQuery("""
+                     select new Map(
+                			iae.descrizioneValore as istanzaAttributo_descrizione,
+                			iae.valoreStringa as valoreStringa,
+                			iae.valoreIntero as valoreIntero,
+                			iae.valoreDecimale as valoreDecimale,
+                			iae.valoreBooleano as valoreBooleano,
+                			iae.valoreData as valoreData,
+                			iae.valoreEntita as valoreEntita,
+                			iae.valoreTesto as valoreTesto,
+                			iae.valoreJson as valoreJson,
+                			a.codice as codice
+                	)
+                	from IstanzaAttributoEntita iae
+                	join iae.attributo a
+                	where iae.infoEntita.entita = it.sydema.laweb.domain.Enums\$Entita.PROCEDURA_LEGALE
+                	and iae.infoEntita.idEntita = :idProcedura
+                	and (a.codice = 'D_DATAPROVVEDIMENTOESE' or 
+                	a.codice = 'D_IMPORTOINGIUNTO' or a.codice = 'D_DATAPROVVEDIMENTONONESE')""").setParameter('idProcedura',it.id).resultList	
+                    
+                    def dataProvv = attributo.find{it.codice == 'D_DATAPROVVEDIMENTOESE'}?.valoreData
+                    def dataProvvNonEse = attributo.find{it.codice == 'D_DATAPROVVEDIMENTONONESE'}?.valoreData
+                    def importoIngiuntivo = attributo.find{it.codice == 'D_IMPORTOINGIUNTO'}?.valoreDecimale
+                    
+                    def data = ''
+                    
+                    if(dataProvv == null && dataProvvNonEse == null){
+                        data = ''
+                    }
+                    if(dataProvv == null){
+                        data = dataProvvNonEse?.format(formattazioneDate).toString()
+                    }
+                    if(dataProvvNonEse == null){
+                        data = dataProvv?.format(formattazioneDate).toString()
+                    }
+                    
+    
+                    
+                	attributiDecretoIngiuntivo << [
+    	                'dataEmissione': data != null ? data : '',
+    	                'importoIngiuntoDI': importoIngiuntivo != null ? importoIngiuntivo : 0.00,
+    	                'provissoriamenteEsecutivo': dataProvv != null ? 'SI' : 'NO'
+    	            ]
+     	    }   
+     	    
+     	    if((it.descrizione).equals("Precetto") || (it.descrizione).equals("Atto di precetto")){
+     	        attributo = entityManager.createQuery("""
+                    select new Map(
+                			iae.descrizioneValore as istanzaAttributo_descrizione,
+                			iae.valoreStringa as valoreStringa,
+                			iae.valoreIntero as valoreIntero,
+                			iae.valoreDecimale as valoreDecimale,
+                			iae.valoreBooleano as valoreBooleano,
+                			iae.valoreData as valoreData,
+                			iae.valoreEntita as valoreEntita,
+                			iae.valoreTesto as valoreTesto,
+                			iae.valoreJson as valoreJson,
+                			a.codice as codice
+                	)
+                	from IstanzaAttributoEntita iae
+                	join iae.attributo a
+                	where iae.infoEntita.entita = it.sydema.laweb.domain.Enums\$Entita.PROCEDURA_LEGALE
+                	and iae.infoEntita.idEntita = :idProcedura
+                	and (a.codice = 'D_DATANOTIFICAPRECETTO' or a.codice = 'D_IMPORTO' 
+                	or a.codice = 'D_TERMINEULTIMOVALIDITA_RINNOVAZIONE')""").setParameter('idProcedura',it.id).resultList	
+                	
+                    def dataNotifica = attributo.find{it.codice == 'D_DATANOTIFICAPRECETTO'}?.valoreData
+                    def importo = attributo.find{it.codice == 'D_IMPORTO'}?.valoreDecimale
+                    def dataTermine = attributo.find{it.codice == 'D_TERMINEULTIMOVALIDITA_RINNOVAZIONE'}?.valoreData
+                  
+                    attributiAttoDiPrecetto << [
+        	            'dataNotificaAP': dataNotifica != null ? dataNotifica?.format(formattazioneDate).toString() : '',
+        	            'importo': importo != null ? importo : 0.00,
+        	            'dataUltimoTermine': dataTermine != null ? dataTermine?.format(formattazioneDate).toString() : '',
+        	        ]
+     	    }
+     	    
+     	    if(it.descrizione == 'Opposizione A Decreto Ingiuntivo' || it.descrizione == 'Opposizione a decreto ingiuntivo – I grado - I fase' || 
+     	    it.descrizione == 'Opposizione a decreto ingiuntivo – I grado - II fase' || it.descrizione == 'Opposizione a decreto ingiuntivo – I grado - III fase' ||
+     	    it.descrizione == 'Opposizione a decreto ingiuntivo – II grado - I fase' || it.descrizione == 'Opposizione a decreto ingiuntivo – II grado - II fase'){
+     	        attributo = entityManager.createQuery("""
+                     select new Map(
+                			iae.descrizioneValore as istanzaAttributo_descrizione,
+                			iae.valoreStringa as valoreStringa,
+                			iae.valoreIntero as valoreIntero,
+                			iae.valoreDecimale as valoreDecimale,
+                			iae.valoreBooleano as valoreBooleano,
+                			iae.valoreData as valoreData,
+                			iae.valoreEntita as valoreEntita,
+                			iae.valoreTesto as valoreTesto,
+                			iae.valoreJson as valoreJson,
+                			a.codice as codice
+                	)
+                	from IstanzaAttributoEntita iae
+                	join iae.attributo a
+                	where iae.infoEntita.entita = it.sydema.laweb.domain.Enums\$Entita.PROCEDURA_LEGALE
+                	and iae.infoEntita.idEntita = :idProcedura
+                	and (a.codice = 'S_RUOLO1' or a.codice = 'D_NOTIFICACITAZIONE' or a.codice = 'D_DATA_RINVIO_20'
+                	or a.codice = 'D_UDIENZAPRIMACOMPARIZIONE')""").setParameter('idProcedura',it.id).resultList
+                	
+                	def ruolo = attributo.find{it.codice == 'S_RUOLO1'}?.valoreStringa
+                	def dataNotificazione = attributo.find{it.codice == 'D_NOTIFICACITAZIONE'}?.valoreData
+                	def dataRinvio = attributo.find{it.codice == 'D_DATA_RINVIO_20'}?.valoreData
+                	def dataPrimaUdienza = attributo.find{it.codice == 'D_UDIENZAPRIMACOMPARIZIONE'}?.valoreData
+                	
+                    	attributiOpposizioneDecretoIngiuntivo << [
+        	                'numeroRuoloTribunale': ruolo != null ? ruolo : '',
+        	                'dataNotificaCitazione': dataNotificazione != null ? dataNotificazione?.format(formattazioneDate).toString() : '',
+        	                'dataUdienzaPrimaComparizione': dataPrimaUdienza != null ? dataPrimaUdienza?.format(formattazioneDate).toString() : '',
+        	                'dataRinvio': dataRinvio != null ? dataRinvio?.format(formattazioneDate).toString() : ''
+        	            ]
+     	    }   
+     	    
+     	    if(it.descrizione == 'Iscrizione Ipoteca Giudiziale Generica' || it.descrizione == 'Iscrizione Ipoteca Giudiziale da D.I.' ||
+     	        it.descrizione == 'Iscrizione di ipoteca giudiziale'){
+     	        attributo = entityManager.createQuery("""
+                     select new Map(
+                			iae.descrizioneValore as istanzaAttributo_descrizione,
+                			iae.valoreStringa as valoreStringa,
+                			iae.valoreIntero as valoreIntero,
+                			iae.valoreDecimale as valoreDecimale,
+                			iae.valoreBooleano as valoreBooleano,
+                			iae.valoreData as valoreData,
+                			iae.valoreEntita as valoreEntita,
+                			iae.valoreTesto as valoreTesto,
+                			iae.valoreJson as valoreJson,
+                			a.codice as codice,
+                    		a.id as idAttributo
+                	)
+                	from IstanzaAttributoEntita iae
+                	join iae.attributo a
+                	where iae.infoEntita.entita = it.sydema.laweb.domain.Enums\$Entita.PROCEDURA_LEGALE
+                	and iae.infoEntita.idEntita = :idProcedura
+                	and (a.codice = 'S_RG' or a.codice = 'S_RP' or a.codice = 'D_ISCRIZIONEIPOTECARIA_DATAISCRIZIONE' or a.codice = 'S_CONSERVATORIA' 
+                	or a.codice = 'S_ISCRIZIONEIPOTECARIA_NOMINATIVO')""").setParameter('idProcedura',it.id).resultList	
+                	
+                	def test = attributo.groupBy({it.idAttributo})
+                	
+                	def registroParticolare = attributo.find{it.codice == 'S_RG'}?.valoreStringa
+                    def registroGenerale = attributo.find{it.codice == 'S_RG'}?.valoreStringa
+                    def dataIscrizione = attributo.find{it.codice == 'D_ISCRIZIONEIPOTECARIA_DATAISCRIZIONE'}?.valoreData
+                    def conservatoria = attributo.find{it.codice == 'S_CONSERVATORIA'}?.valoreStringa
+                    def nominativo = attributo.find{it.codice == 'S_ISCRIZIONEIPOTECARIA_NOMINATIVO'}?.valoreStringa
+                	
+                	
+                    def registroTot = ''
+                    
+                    if(registroParticolare == null){
+                        registroParticolare = ''
+                    }
+                    
+                    if(registroGenerale == null){
+                        registroGenerale = ''
+                    }
+                        
+                    if(registroGenerale == ''){
+                        registroTot = registroParticolare    
+                    } else if(registroParticolare == ''){
+                                registroTot = registroGenerale
+                            }else{
+                                registroTot = registroGenerale + " / " +  registroParticolare    
+                            }
+                    
+                        attributiIpotecaGiudiziale << [
+        	                'inserimentoRegistri': registroTot,
+        	                'dataIscrizione': dataIscrizione != null ? dataIscrizione?.format(formattazioneDate).toString() : '',,
+        	                'conservatoria': conservatoria != null ? conservatoria : '',
+        	                'nominativo': nominativo != null ? nominativo : ''
+        	            ]
+     	    }
+     	    
+     	    if(it.descrizione == 'Esecuzione Immobiliare' || it.descrizione == 'Esecuzione immobiliare' || it.descrizione == 'Esecuzione immobiliare -I fase' ||
+                it.descrizione =='Esecuzione immobiliare -II fase' || it.descrizione == 'Esecuzione immobiliare -III fase'){
+     	        attributo = entityManager.createQuery("""
+                     select new Map(
+                			iae.descrizioneValore as istanzaAttributo_descrizione,
+                			iae.valoreStringa as valoreStringa,
+                			iae.valoreIntero as valoreIntero,
+                			iae.valoreDecimale as valoreDecimale,
+                			iae.valoreBooleano as valoreBooleano,
+                			iae.valoreData as valoreData,
+                			iae.valoreEntita as valoreEntita,
+                			iae.valoreTesto as valoreTesto,
+                			iae.valoreJson as valoreJson,
+                			a.codice as codice
+                	)
+                	from IstanzaAttributoEntita iae
+                	join iae.attributo a
+                	where iae.infoEntita.entita = it.sydema.laweb.domain.Enums\$Entita.PROCEDURA_LEGALE
+                	and iae.infoEntita.idEntita = :idProcedura
+                	and (a.codice = 'S_NUMERO' or a.codice = 'S_IDTRIBUNALE' or a.codice = 'D_DATAPIGNORAMENTO' 
+                	    or a.codice = 'S_CTU_VA1' or a.codice = 'D_VALCTU')""")
+                	.setParameter('idProcedura',it.id).resultList	
+                	
+                    def numero = attributo.find{it.codice == 'S_NUMERO'}?.valoreStringa
+                    def tribunale = attributo.find{it.codice == 'S_IDTRIBUNALE'}?.valoreStringa
+                    def dataPignoramento = attributo.find{it.codice == 'D_DATAPIGNORAMENTO'}?.valoreData
+                    def CTUdepositata = attributo.find{it.codice == 'S_CTU_VA1'}?.valoreStringa
+                    def valutazioneCTU = attributo.find{it.codice == 'D_VALCTU'}?.valoreDecimale
+                    
+                    def numeroEsecuzioneTribunale = ''
+                    
+                    if(numero == null){
+                        numero = ''
+                    }
+                    
+                    if(tribunale == null){
+                        tribunale = ''
+                    }
+                    
+                    if(tribunale.isNumber()){
+                        tribunale = ''
+                    }
+                    
+                     if(CTUdepositata == '0'){
+                        CTUdepositata = 'Non valorizzata'
+                    }
+                    if(CTUdepositata == '1'){
+                        CTUdeposita = 'SI'
+                    }
+                    
+                    numeroEsecuzioneTribunale = numero + " " + tribunale
+                    
+                    attributiEsecuzioneImmobiliare << [
+        	            'numeroEsecuzioneTribunale': numeroEsecuzioneTribunale,
+        	            'dataPignoramento': dataPignoramento != null ? dataPignoramento?.format(formattazioneDate).toString() : '',
+        	            'CTUdepositata': CTUdepositata != null ? CTUdepositata : 'Non valorizzata',
+        	            'valutazioneCTU': valutazioneCTU ? valutazioneCTU : 0.00
+        	        ]
+     	    } 
+     	    
+     	    if(it.descrizione == 'Intervento in Esecuzione Immobiliare' || it.descrizione == 'Intervento in esecuzione immobiliare' || 
+     	        it.descrizione == 'Intervento in Esecuzione Immobiliare - I fase' || it.descrizione == 'Intervento in Esecuzione Immobiliare - II fase'){
+     	        attributo = entityManager.createQuery("""
+                     select new Map(
+                			iae.descrizioneValore as istanzaAttributo_descrizione,
+                			iae.valoreStringa as valoreStringa,
+                			iae.valoreIntero as valoreIntero,
+                			iae.valoreDecimale as valoreDecimale,
+                			iae.valoreBooleano as valoreBooleano,
+                			iae.valoreData as valoreData,
+                			iae.valoreEntita as valoreEntita,
+                			iae.valoreTesto as valoreTesto,
+                			iae.valoreJson as valoreJson,
+                			a.codice as codice
+                	)
+                	from IstanzaAttributoEntita iae
+                	join iae.attributo a
+                	where iae.infoEntita.entita = it.sydema.laweb.domain.Enums\$Entita.PROCEDURA_LEGALE
+                	and iae.infoEntita.idEntita = :idProcedura
+                	and (a.codice = 'S_RGNUMERO' or a.codice = 'S_IDTRIBUNALE' or a.codice = 'D_DATADEPOSITOINTERVENTO' 
+                	        or a.codice = 'S_CTU_VA1' or a.codice='D_CTUCOMPLESSIVA')""").setParameter('idProcedura',it.id).resultList	
+                	
+                    def numero = attributo.find{it.codice == 'S_RGNUMERO'}?.valoreStringa
+                    def tribunale = attributo.find{it.codice == 'S_IDTRIBUNALE'}?.valoreStringa
+                    def dataDeposito = attributo.find{it.codice == 'D_DATADEPOSITOINTERVENTO'}?.valoreData
+                    def CTUdepositata = attributo.find{it.codice == 'S_CTU_VA1'}?.valoreStringa
+                    def valutazioneCTU = attributo.find{it.codice == 'D_CTUCOMPLESSIVA'}?.valoreDecimale
+                    
+                    def numeroEsecuzioneTribunale = ''
+                    
+                    if(numero == null){
+                        numero = ''
+                    }
+                    
+                    if(tribunale == null){
+                        tribunale = ''
+                    }
+                    
+                    if(tribunale.isNumber()){
+                        tribunale = ''
+                    }
+                    
+                    if(CTUdepositata == '0'){
+                        CTUdepositata = 'Non valorizzata'
+                    }
+                    if(CTUdepositata == '1'){
+                        CTUdepositata = 'SI'
+                    }
+                    
+                    numeroEsecuzioneTribunale = numero + " " + tribunale    
+                        
+                    attributiInterventoInEsecuzione << [
+        	            'numeroEsecuzioneTribunale': numeroEsecuzioneTribunale,
+        	            'dataDepositoIntervento': dataDeposito != null ? dataDeposito?.format(formattazioneDate).toString() : '',
+        	            'CTUdepositata': CTUdepositata != null ? CTUdepositata : 'NO',
+        	            'valutazioneCTU': valutazioneCTU ? valutazioneCTU : 0.00
+        	       ]
+     	    }
+     	    
+     	    if(it.descrizione == 'Ammissione Al Passivo Fallimentare Ex Art. 101 L.F.' || it.descrizione == 'Ammissione Al Passivo Fallimentare Ex Art. 93 L.F.' ||
+     	        it.descrizione == 'Ammissione al passivo ordinaria ex art. 93 L.F.' || 
+     	            it.descrizione == 'Ammissione al passivo fallimentare tardiva ex art. 101 L.F.'){
+     	        attributo = entityManager.createQuery("""
+                     select new Map(
+                			iae.descrizioneValore as istanzaAttributo_descrizione,
+                			iae.valoreStringa as valoreStringa,
+                			iae.valoreIntero as valoreIntero,
+                			iae.valoreDecimale as valoreDecimale,
+                			iae.valoreBooleano as valoreBooleano,
+                			iae.valoreData as valoreData,
+                			iae.valoreEntita as valoreEntita,
+                			iae.valoreTesto as valoreTesto,
+                			iae.valoreJson as valoreJson,
+                			a.codice as codice
+                	)
+                	from IstanzaAttributoEntita iae
+                	join iae.attributo a
+                	where iae.infoEntita.entita = it.sydema.laweb.domain.Enums\$Entita.PROCEDURA_LEGALE
+                	and iae.infoEntita.idEntita = :idProcedura
+                	and (a.codice = 'S_IDTRIBUNALE' or a.codice = 'D_SP_DATAFALLIMENTO' or a.codice = 'D_CREDITOAMMESSOPARZ1' 
+                	        or a.codice = 'D_CREDITOAMMESSO1')""").setParameter('idProcedura',it.id).resultList	
+                	        
+                    def tribunale = attributo.find{it.codice == 'S_IDTRIBUNALE'}?.valoreStringa
+                    def dataFallimento = attributo.find{it.codice == 'D_SP_DATAFALLIMENTO'}?.valoreData
+                    def valoreRichiesto = attributo.find{it.codice == 'D_CREDITOAMMESSOPARZ1'}?.valoreDecimale
+                    def valoreAmmesso = attributo.find{it.codice == 'D_CREDITOAMMESSO1'}?.valoreDecimale
+                    
+                     if(tribunale == null){
+                        tribunale = ' '
+                    }
+                    
+                    if(tribunale.isNumber()){
+                        tribunale = ' '
+                    }
+                    
+                    def numeroEsecuzioneTribunale = ' '
+                    
+                    numeroEsecuzioneTribunale = tribunale    
+                    
+                    attributiAmmissioneAlPassivo << [
+        	                'codificaTribunale': numeroEsecuzioneTribunale != null ? numeroEsecuzioneTribunale : ' ',
+        	                'dataFallimento': dataFallimento != null ? dataFallimento?.format(formattazioneDate).toString() : '',
+        	                'valoreAmmissioneRichiesto': valoreRichiesto != null ? valoreRichiesto : 0.00,
+        	                'valoreCreditoAmmesso': valoreAmmesso != null ? valoreAmmesso : 0.00
+        	            ]
+     	    }
+ 	    }
+ 	}
+ 		
+ 	def nota = first(entityManager.createQuery("""
+        select ne.testo 
+		from NotaEntita ne
+		left join ne.tipologiaNota tn
+		left join ne.elementoOrganizzativo eo
+		left join ne.istanzaTask t
+		left join t.definizioneTask dt
+		where ne.infoEntita.idEntita = :posizione_id
+		and tn.descrizione = 'Annotazione Stampa Copertina'
+	    and ne.infoEntita.entita = it.sydema.laweb.domain.Enums\$Entita.POSIZIONE""").setParameter('posizione_id', posizione_id).resultList)
+	
+	List<Map<String,Object>> dataBeanList = new ArrayList<Map<String,Object>>();
+	
+	dataBeanList << [
+	    'intestazionePosizione': posizione.intestazionePosizione,
+	    'ndgPosizione': posizione.ndgPosizione,
+	    'filialePosizioneCompleto': posizione.idFiliale.toString() + " - " + posizione.filialePosizione,
+	    'residenza': luogoPosizione.comune,
+	    'dataNascita': soggettoAnagraficoPosizione.dataNascita != null ? soggettoAnagraficoPosizione.dataNascita?.format(formattazioneDate).toString() : 
+	                   (soggettoAnagraficoPosizione.dataIscrizione != null ? soggettoAnagraficoPosizione.dataIscrizione?.format(formattazioneDate).toString() :
+	                   ''),
+	    'codiceFiscalePosizione': (soggettoAnagraficoPosizione.codiceFiscale != null && soggettoAnagraficoPosizione.codiceFiscale!= '') ? 
+	                              soggettoAnagraficoPosizione.codiceFiscale : soggettoAnagraficoPosizione.partitaIva,
+	    'numeroSofferenza': posizione.codiceSofferenza,
+	    'statoPratica': posizione.dataChiusura != null ? 'Chiusa' : 'Aperta',
+	    'dataApertura': posizione.dataApertura?.format(formattazioneDate).toString(),
+	    'dataChiusura': (posizione.dataChiusura != null) ? posizione.dataChiusura?.format(formattazioneDate).toString() : 'Posizione Aperta',
+	    'filialePosizione': posizione.filialePosizione,
+	    'idGestoreInterno': gestoreInterno != null ? gestoreInterno.id.toString() : '' ,
+	    'intestazioneGestoreInterno': gestoreInterno != null ? gestoreInterno.elementoOrganizzativoReferente : '',
+	    'idLegaleEsterno': legaleEsterno != null ? legaleEsterno.id.toString() : '',
+	    'intestazioneLegaleEsterno': legaleEsterno != null ? legaleEsterno.elementoOrganizzativoReferente : '',
+	    'idGestoreEsterno': gestoreEsterno != null ? gestoreEsterno.id.toString() : '',
+	    'intestazioneGestoreEsterno': gestoreEsterno != null ? gestoreEsterno.elementoOrganizzativoReferente : '',
+	    'totaleCapitale': (capitale != null ? capitale : 0.00) + (interessiAddebitati != null ? interessiAddebitati : 0.00) + 
+	                        (spese != null ? spese : 0.00),
+	    'capitale': capitale != null ? capitale : 0.00,
+	    'interessiAddebitati': interessiAddebitati != null ? interessiAddebitati : 0.00,
+	    'spese': spese != null ? spese : 0.00,
+	    'interessiContabile': (interessiDiMora != null ? interessiDiMora : 0.00) + (interessi != null ? interessi : 0.00),
+	    'interessiDiMora': interessiDiMora != null ? interessiDiMora : 0.00,
+	    'interessi': interessi != null ? interessi : 0.00,
+	    'passaggioAPerdita': passaggioPerdita.passaggiPerdita != null ? passaggioPerdita.passaggiPerdita : 0.00,
+	    'totaleDebitoria': (capitale != null ? capitale : 0.00) + (interessiDiMora != null ? interessiDiMora : 0.00) +
+	                        (interessi != null ? interessi : 0.00) + (passaggioPerdita.passaggiPerdita != null ? passaggioPerdita.passaggiPerdita : 0.00),
+	    'sommaCapitaleRecupero': cassaRecupero + firmaRecupero,
+	    'interessiRecupero': interessiRecupero != 0 ? interessiRecupero : 0.00,
+	    'totaleRecupero': cassaRecupero + firmaRecupero + interessiRecupero,
+	    'sommaCapitalePerdita': cassaPerdita + firmaPerdita,
+	    'interessiPerdita': interessiPerdita != 0 ? interessiPerdita : 0.00,
+	    'totalePerdita': cassaPerdita + firmaPerdita + interessiPerdita,
+	    'garanzieRealiDataSet' : garanzieIpotecariePosizione,
+	    'garanziePersonaliDataSet': garanziePersonaliPosizione,
+	    'immobiliDataSet': immobili,
+	    'decretoIngiuntivoDataSet': attributiDecretoIngiuntivo,
+	    'attoDiPrecettoDataSet': attributiAttoDiPrecetto,
+	    'opposizioneDecretoIngiuntivoDataSet': attributiOpposizioneDecretoIngiuntivo,
+	    'ipotecaGiudizialeDataSet': attributiIpotecaGiudiziale,
+	    'esecuzioneImmobiliareDataSet': attributiEsecuzioneImmobiliare,
+	    'interventoEsecuzioneImmobiliare': attributiInterventoInEsecuzione,
+	    'ammissioneAlPassivoDataSet': attributiAmmissioneAlPassivo,
+	    'nota': nota != null ? nota : 'Nessuna nota trovata'
+	    
+	]
+	
+	return dataBeanList
+
+}    	

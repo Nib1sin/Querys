@@ -1,0 +1,327 @@
+import it.sydema.laweb.domain.Enums.Entita
+import it.sydema.laweb.domain.Enums.TipoDatoCampoEntitaDerivata
+
+
+
+		
+
+def posizioni = entityManager.createQuery("""
+select distinct
+    new Map(
+        p.id as                     id,
+        p.intestazione as           intestazione,
+        p.ndgControparte as         ndg,
+        eo.id as                    id_istituto,
+        eo.nomeCompleto as          nome_istituto,
+		'Studio legale esterno' as  classeSLE,
+		eor.nomeCompleto as         NomeReferente_Pratica,
+        eor.id as                   IdReferente_Pratica,
+        day_diff(sre.dataInizioValidita, current_date()) as giorni_gestore
+        )
+    from
+        Posizione p, StoricoReferenteEntita sre
+        left join   p.elementoOrganizzativoMandante eo
+        join        p.infoEntita                       ie
+        join        sre.ruoloReferenteEntita           rre
+        join        sre.elementoOrganizzativoReferente eor
+        where   p.dataChiusura is null
+                and sre.infoEntita.id = p.infoEntita.id
+                and sre.corrente = true
+                and rre.descrizione = 'Referente'
+                
+        """).resultList
+        
+        
+        
+def referenti_Pratica = 
+        entityManager.createQuery("""
+        select
+            new Map(
+                p.id as                     posizione_id,
+        		eor.nomeCompleto as         NomeReferente_Pratica,
+                eor.id as                   IdReferente_Pratica,
+                rre.descrizione as          ruolo,
+                sre.dataInizioValidita as   data,
+                day_diff(sre.dataInizioValidita, current_date()) as giorni_gestore
+                )
+            from
+                Posizione p, StoricoReferenteEntita sre
+                left join   p.elementoOrganizzativoMandante eo
+                join        p.infoEntita                       ie
+                join        sre.ruoloReferenteEntita           rre
+                join        sre.elementoOrganizzativoReferente eor
+                where   p.dataChiusura is null
+                        and sre.infoEntita.id = p.infoEntita.id
+                        and sre.corrente = true
+                        and rre.descrizione in ('Referente', 'Gestore', 'Mandatario', 'Ufficio Recupero Esternalizzato',
+                                                'Legale esterno','Ufficio Crediti a Recupero',
+                                                'Ufficio Contenzioso', 'SRE', 'Società recupero crediti')
+                       
+        """)
+            
+        .resultList					
+           
+    .groupBy {
+		it.posizione_id
+	}
+	
+	
+	
+	
+def referenti_Proceduralegale = posizioni
+    .findAll{it.id != null}
+	.collect{[id : it.id]}
+	.collate(1000)
+	.collectMany{
+	    entityManager.createQuery("""
+        select
+            new Map(
+                ie.idEntita as procedura_id,
+                eap.idElemento as posizione_id,
+                rre.descrizione as ruolo,
+                eo.id as id,
+                eo.nomeCompleto as nome,
+                sre.dataInizioValidita as data,
+                day_diff(sre.dataInizioValidita, current_date()) as giorni
+            )
+        from    InfoEntita ie, ProceduraLegale pl
+        join    ie.storiciReferentiEntite sre
+        join    sre.ruoloReferenteEntita rre
+        join    sre.elementoOrganizzativoReferente eo
+        join    pl.elementiAssociatiProcedureLegali eap 
+                with eap.tipoElementoAssociatoProceduraLegale = it.sydema.laweb.domain.Enums\$TipoElementoAssociatoProceduraLegale.POSIZIONE
+        where
+                ie.entita = it.sydema.laweb.domain.Enums\$Entita.PROCEDURA_LEGALE
+                and ie.idEntita = pl.id
+                and sre.corrente = true
+                and rre.descrizione in ('Referente', 'Responsabile Ufficio Referente', 'SLE', 'SRE', 'Legale Esterno', 'Società recupero crediti')
+                and eap.idElemento in (:id)
+        """)
+    .setParameter("id",it.id)    
+    .resultList					
+    }
+    .groupBy {
+		it.posizione_id
+	}	
+	
+	
+	
+def BU_referenti_posizioni = posizioni
+    .findAll{it.id != null}
+	.collect{[IdReferente_Pratica : it.IdReferente_Pratica]}
+	.collate(1000)
+	.collectMany{
+        entityManager.createQuery("""
+        select distinct 
+            new Map(
+            	eo.id as                                    id,
+            	eo.nomeCompleto as                          nome,
+            	sbu.elementoOrganizzativo.id as				Id_Ufficio,
+                sbu.nomeCompleto as 						Ufficio
+                )
+        from    ElementoOrganizzativo eo, RuoloReferenteEntita rre
+        join    eo.storiciPersone sp
+        join    sp.storicoBusinessUnit sbu
+        join    sbu.storicoStrutturaOrganizzativa sso
+        join    rre.storiciReferentiEntite sre
+        join    sre.elementoOrganizzativoReferente eor
+        join    eo.storiciPersone spr
+        where 
+                sre.corrente = true
+                and rre.descrizione in ('Referente', 'Responsabile Ufficio Referente')
+                and sso.corrente = true
+                and eo.id in (:id)
+    """)     
+    .setParameter("id",it.IdReferente_Pratica)    
+    .resultList					
+    }
+    .groupBy {
+		it.id
+	}	
+	
+	
+	
+	
+posizioni.collect{ p->
+    
+    p['Ufficio_Referente'] = BU_referenti_posizioni[p.IdReferente_Pratica ]?.Ufficio
+    p['Id_Ufficio_Referente'] = BU_referenti_posizioni[p.IdReferente_Pratica]?.Id_Ufficio	
+	
+	
+	referenti_Proceduralegale[p.id]?.each{ ref ->
+            def r = ref.ruolo.replaceAll("\\s","")                
+            if(r.equals("Referente")){
+				if(ref.data > p["data_$r"]){
+				    p["data_$r"] = ref.data
+				    p["giorni_$r"] = ref.giorni
+					p["id_$r"] = ref.id
+					p["nome_$r"] = ref.nome
+				}
+			}else{
+			        p["data_$r"] = ref.data
+				    p["giorni_$r"] = ref.giorni
+					p["id_$r"] = ref.id
+					p["nome_$r"] = ref.nome
+			}
+    }  
+	
+	
+	referenti_Pratica[p.id]?.each{ rp ->
+	        def r = rp.ruolo.replaceAll("\\s","")
+	        if(r.equals("Referente")){
+				if(rp.data > p["data_pratica_$r"]){
+				    p["data_pratica_$r"] = rp.data
+				    p["giorni_pratica_$r"] = rp.giorni_gestore
+					p["id_pratica_$r"] = rp.IdReferente_Pratica
+					p["nome_pratica_$r"] = rp.NomeReferente_Pratica
+				}
+			}else{
+			        p["data_pratica_$r"] = rp.data
+				    p["giorni_pratica_$r"] = rp.giorni_gestore
+					p["id_pratica_$r"] = rp.IdReferente_Pratica
+					p["nome_pratica_$r"] = rp.NomeReferente_Pratica
+			}
+	}
+	
+//	p['id_gestore'] = p.IdReferente_Pratica
+//	p['nome_gestore'] = p.NomeReferente_Pratica
+	
+    p
+    
+}
+
+
+	
+	
+
+
+new it.sydema.laweb.services.EntitaDerivataSolrService.DeterminazioneEntitaDerivata() {
+	public String getNomeCampoChiave() { 'id' }
+
+	public Collection<?> getCampi() {
+	    [       
+	        [   
+            	nome: 'id',
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'nome_istituto',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+            ],
+            [   
+            	nome: 'ndg',
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+            ],
+            [   
+            	nome: 'intestazione',
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+            ],
+            [   
+            	nome: 'nome_pratica_Referente',
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+            ],
+            [   
+            	nome: 'giorni_pratica_Referente',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'id_pratica_Referente',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'nome_SLE',
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+            ],
+            [   
+            	nome: 'giorni_SLE',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'id_SLE',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            
+            [   
+            	nome: 'nome_LegaleEsterno',
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+            ],
+            [   
+            	nome: 'giorni_LegaleEsterno',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'id_LegaleEsterno',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'nome_pratica_SLE',
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+            ],
+            [   
+            	nome: 'giorni_pratica_SLE',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'id_pratica_SLE',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'nome_pratica_LegaleEsterno',
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+            ],
+            [   
+            	nome: 'giorni_pratica_LegaleEsterno',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'id_pratica_LegaleEsterno',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'nome_SRE',
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+            ],
+            [   
+            	nome: 'giorni_SRE',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'id_SRE',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'nome_pratica_SRE',
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+            ],
+            [   
+            	nome: 'giorni_pratica_SRE',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [   
+            	nome: 'id_pratica_SRE',	
+            	tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+            ],
+            [
+    	        nome: 'NomeReferente_Prattica',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+    	    ], 
+    	    [
+    	        nome: 'IdReferente_Pratica',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+    	    ], 
+    	    [
+               nome: 'Id_Ufficio_Referente',
+               tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+           ],  
+           [
+               nome: 'Ufficio_Referente',
+               tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+           ]
+    	 ]
+	}
+	
+	public Collection<?> getData() {
+        posizioni
+	}
+}
+    

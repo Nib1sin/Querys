@@ -1,0 +1,20 @@
+Sequestro Giudiziario
+PST - Assegnazione referente pratica 				rm
+PST - Creazione Procedura Legale (GENERICA) 		rm
+
+
+Assegnazione Procedura Legale Al Processo
+PST - Creazione Procedura Legale Generica_2 									add
+PST - Associazione manuale ProceduraLegale come EntitaProcesso (Cognizione) 	add	
+PST - Assegnazione referente pratica 											add
+PST - Aggiornamento Soggetti Procedura Legale 									add
+Attributo : Procedura Legale  													rm
+
+
+
+Selezione Soggetti
+PST - Creazione Entità Processo Per Selezione Esecutati (Cognizione)	add	
+ANN - Entita Processo Soggetti Selezionati								add
+
+Selezione Rapporti
+PST - Creazione Entità Processo Per Rapporto Esecutati (Cognizione)		add

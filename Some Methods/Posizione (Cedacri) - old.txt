@@ -1,0 +1,318 @@
+import it.sydema.laweb.domain.Enums.Entita
+import it.sydema.laweb.domain.Enums.TipoDatoCampoEntitaDerivata
+import it.sydema.laweb.services.ListaTemporaneaService
+import it.sydema.laweb.repository.extended.PosizioneSygesRepository
+import it.sydema.laweb.services.ContabilitaSygesService
+
+new it.sydema.laweb.services.EntitaDerivataSolrService.DeterminazioneEntitaDerivata() {
+	public String getNomeCampoChiave() { 'id' }
+		
+	public Collection<?> getCampi() {
+        [
+            [
+    	        nome: 'id',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO,
+    	        entita: Entita.POSIZIONE
+    	    ], [
+    	        nome: 'intestazione',
+    	        descrizione: 'Nominativo',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        ricercaFullText: true
+    	    ], [
+    	        nome: 'ndg',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        ricercaFullText: true
+    	    ], [
+    	        nome: 'codicePratica',
+    	        descrizione: 'Posizione Syges3',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA
+    	    ], [
+    	        nome: 'codiceIstituto',
+    	        descrizione: 'Codice istituto',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'classificazione',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'dataApertura',
+    	        descrizione: 'Data inizio',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.DATA
+    	    ], [
+    	        nome: 'dataSofferenza',
+    	        descrizione: 'Data inizio sofferenza',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.DATA
+    	    ], [
+    	        nome: 'dataChiusura',
+    	        descrizione: 'Data chiusura',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.DATA
+    	    ], [
+    	        nome: 'stato',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'filiale_id',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+    	    ], [
+    	        nome: 'filiale_nomeCompleto',
+    	        descrizione: 'Filiale',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'garanziePersonali',
+    	        descrizione: 'Garanzie personali',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.BOOLEANO,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'garanzieReali',
+    	        descrizione: 'Garanzie reali',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.BOOLEANO,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'idGestore',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+    	    ], [
+    	        nome: 'nomeGestore',
+    	        descrizione: 'Gestore',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'dataAssegnazioneGestore',
+    	        descrizione: 'Data assegnazione gestore',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.DATA
+    	    ], [
+    	        nome: 'idMandatario',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+    	    ], [
+    	        nome: 'nomeMandatario',
+    	        descrizione: 'Mandatario',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'dataAssegnazioneMandatario',
+    	        descrizione: 'Data assegnazione Mandatario',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.DATA
+    	    ], [
+    	        nome: 'idUfficioRecuperoEsternalizzato',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.INTERO
+    	    ], [
+    	        nome: 'nomeUfficioRecuperoEsternalizzato',
+    	        descrizione: 'Uff. Rec. Esternalizzato',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'nomeLegaleEsterno',
+    	        descrizione: 'Legale Esterno',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'nomeUfficioContenzioso',
+    	        descrizione: 'Uff. Contenzioso',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'nomeUfficioCreditiaRecupero',
+    	        descrizione: 'Uff. crediti a rec',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.STRINGA,
+    	        generaFacet: true
+    	    ], [
+    	        nome: 'dataAssegnazioneUfficioRecuperoEsternalizzato',
+    	        descrizione: 'Data assegnazione Uff. Rec. Est.',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.DATA
+    	    ], [
+    	        nome: 'saldo',
+    	        descrizione: 'Credito lordo',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.DECIMALE
+    	    ], [
+    	        nome: 'incassi',
+    	        descrizione: 'Incassi',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.DECIMALE
+    	    ], [
+    	        nome: 'prevPerditaTotale',
+    	        descrizione: 'Previsione Perdita',
+    	        tipoDatoCampoEntitaDerivata: TipoDatoCampoEntitaDerivata.DECIMALE
+    	    ] 
+	    ]
+	}
+			
+	public Collection<?> getData() {
+        // recupero i referenti dei tipi previsti raggruppandoli per posizione
+        def referenti = entityManager.createQuery("""
+            select new Map(
+                ie.idEntita as posizione_id,
+                sre.dataInizioValidita as dataInizioValidita,
+                eor.id as elementoOrganizzativoReferente_id,
+                eor.nomeCompleto as elementoOrganizzativoReferente_nomeCompleto,
+                rre.descrizione as ruolo
+            )
+            from
+                StoricoReferenteEntita sre, Posizione p
+                join sre.infoEntita ie
+                join sre.elementoOrganizzativoReferente eor
+                join sre.ruoloReferenteEntita rre
+            where
+                ie.entita = it.sydema.laweb.domain.Enums\$Entita.POSIZIONE
+                and ie.idEntita = p.id
+                and sre.corrente = true
+                and rre.descrizione in ('Gestore', 'Mandatario', 'Ufficio Recupero Esternalizzato','Legale esterno','Ufficio Crediti a Recupero','Ufficio Contenzioso')
+                """)
+            .resultList
+            .groupBy {
+                it.posizione_id
+            }
+
+        // recupero i dati di posizione
+        def data = entityManager.createQuery("""
+            select new Map(
+                p.id as id,
+                p.intestazione as intestazione,
+                p.ndgControparte as ndg,
+                p.codicePratica as codicePratica,
+                case when p.tipologiaPosizione = it.sydema.laweb.domain.Enums\$TipologiaPosizione.SOFFERENZA 
+                    then 'Sofferenza' else 'Incaglio' end as classificazione,
+                p.dataApertura as dataApertura,
+                p.dataSofferenza as dataSofferenza,
+                p.dataChiusura as dataChiusura,
+                p.codiceIstituto as codiceIstituto,
+                case when p.dataChiusura is not null then 'Chiusa' else 'Aperta' end as stato,
+                f.id as filiale_id,
+                f.nomeCompleto as filiale_nomeCompleto,
+                case when exists (select g from p.garanzie g 
+                        where g.tipoGaranzia.classeGaranzia = it.sydema.laweb.domain.Enums\$ClasseGaranzia.PERSONALE)
+                    then true else false end as garanziePersonali,
+                case when exists (select g from p.garanzie g 
+                        where g.tipoGaranzia.classeGaranzia in (
+                            it.sydema.laweb.domain.Enums\$ClasseGaranzia.IPOTECARIA,
+                            it.sydema.laweb.domain.Enums\$ClasseGaranzia.PIGNORATIZIA))
+                    then true else false end as garanzieReali
+            )
+            from
+                Posizione p
+                left join p.elementoOrganizzativoFilialePrevalente f""")
+            .resultList
+
+        def saldi = [ : ]
+
+        def lts = context.getBean(ListaTemporaneaService.class)
+        def guid = lts.writeIdList(data.collect { it.id })
+
+        try {
+            // recupero i saldi
+            saldi = context.getBean(PosizioneSygesRepository.class)
+                .saldoPosizioni(guid as String)
+                .collectEntries {
+                    [ it.id, it.saldo ]
+                }
+        }
+        finally {
+            lts.delete(guid)
+        }
+        
+		// INCASSI
+		
+		def incassi = entityManager.createNativeQuery ("""
+		select 
+            incassi.id as id,
+            incassi.incassi as incassi,
+            prevPerditaTotale.prevPerditaTotale as prevPerditaTotale
+            from (
+             select  
+			 id,
+             sum(incassi * segno) as incassi
+            from (
+               select
+                 R.posizione_id as id,
+                 case when C.FSTORNO = 'S' then -1 else 1 end as segno,
+                 case
+                   when CAT.FCATCONT = 'C' and C.TCAUSALE in ('INCE', 'INCA') then M.IMOVIMEN
+                   else 0
+                 end as incassi
+               from LAWEB4.Rapporto R
+               left join SYGES.CATEGORIESYGES CAT on
+                 CAT.CISTNUME = R.CISTNUME and
+                 CAT.FINCSOFF = R.FINCSOFF and
+                 CAT.CCATEGOR = R.CCATEGOR and
+                 CAT.CSOTCATE = R.CSOTCATE
+               left join SYGES.MOVIMENTICONTABILISYGES M on
+                 M.CISTNUME = R.CISTNUME and
+                 M.FINCSOFF = R.FINCSOFF and
+                 M.CPRATICA = R.CPRATICA and
+                 M.CFILIALE = R.CFILIALE and
+                 M.CCATEGOR = R.CCATEGOR and
+                 M.CSOTCATE = R.CSOTCATE and
+                 M.CRAPPORT = R.CRAPPORT
+               left join SYGES.CAUSALICONTABILISYGES C on
+                 C.CISTNUME = M.CISTNUME and
+                 C.FCAUSALE = M.FCAUSALE and
+                 C.CCAUSALE = M.CCAUSALE
+            ) A
+            group by id ) Incassi 
+			left join (
+			select
+              id,
+              sum(capitaleCassa + capitaleFirma + interessi) as prevPerditaTotale
+            from (
+               select
+                 R.posizione_id as id,
+                 case
+                    when RAP.FINCSOFF = 'S' and CAT.FCATCONT = 'C' then RAP.IDUBCAPI
+                    when RAP.FINCSOFF = 'I' and RAP.FCASFIRM = 'C' then RAP.IDUBCAPI
+                    else 0
+                 end as capitaleCassa,
+                 case
+                    when RAP.FINCSOFF = 'S' and CAT.FCATCONT = 'F' then RAP.IDUBCAPI
+                    when RAP.FINCSOFF = 'I' and RAP.FCASFIRM = 'F' then RAP.IDUBCAPI
+                    else 0
+                 end as capitaleFirma,
+                 RAP.IDUBINTE as interessi
+                 /* rapporti laweb */
+                 from LAWEB4.Rapporto R
+                 /* categorie */
+                 left join SYGES.CATEGORIESYGES CAT on
+                   CAT.CISTNUME = R.CISTNUME and
+                   CAT.FINCSOFF = R.FINCSOFF and
+                   CAT.CCATEGOR = R.CCATEGOR and
+                   CAT.CSOTCATE = R.CSOTCATE
+                 /* rapporti syges  */
+                 left join SYGES.RAPPORTOSYGES RAP on
+                   RAP.CISTNUME = R.CISTNUME and
+                   RAP.FINCSOFF = R.FINCSOFF and
+                   RAP.CPRATICA = R.CPRATICA and
+                   RAP.CFILIALE = R.CFILIALE and
+                   RAP.CCATEGOR = R.CCATEGOR and
+                   RAP.CSOTCATE = R.CSOTCATE and
+                   RAP.CRAPPORT = R.CRAPPORT
+            ) A
+            group by id
+			) prevPerditaTotale on incassi.id = prevPerditaTotale.id
+			""").resultList
+
+        .collectEntries{[(it[0]):[incassi:it[1],prevPerditaTotale:it[2]]]}
+
+		// FINE INCASSI
+		
+        data.collect { p ->
+            // integro i dati (referenti, saldi)
+            referenti[p.id]?.each {
+                def r = it.ruolo.replaceAll(' ', '')
+
+                if(r.equals("Gestore")){
+					if(it.dataInizioValidita > p["dataAssegnazione$r"]){
+						p["dataAssegnazione$r"] = it.dataInizioValidita
+						p["id$r"] = it.elementoOrganizzativoReferente_id
+						p["nome$r"] = it.elementoOrganizzativoReferente_nomeCompleto
+					}
+				}else{
+					p["dataAssegnazione$r"] = it.dataInizioValidita
+					p["id$r"] = it.elementoOrganizzativoReferente_id
+					p["nome$r"] = it.elementoOrganizzativoReferente_nomeCompleto
+				}
+            }
+            p['saldo'] = saldi[p.id]
+			p['incassi'] = incassi[p.id]?.incassi
+			p['prevPerditaTotale'] = incassi[p.id]?.prevPerditaTotale
+			p
+        }
+	}
+}

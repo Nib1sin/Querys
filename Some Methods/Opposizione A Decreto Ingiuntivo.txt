@@ -1,0 +1,15 @@
+
+Opposizione A Decreto Ingiuntivo
+PST - Creazione Procedura Legale Generica_2 									add
+PST - Associazione manuale ProceduraLegale come EntitaProcesso (Cognizione) 	add	
+PST - Assegnazione referente pratica 											add
+PST - Aggiornamento Soggetti Procedura Legale 									add
+ 
+Iscrizione Della Causa Al Ruolo
+PST - Aggiornamento Entita Procedura Legale 									add
+
+Selezione Rapporti
+PST - Creazione Entità Processo Per Rapporto Esecutati (Cognizione) 			add
+
+Selezione Soggetti
+ 

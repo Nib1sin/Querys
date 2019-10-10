@@ -1,0 +1,21 @@
+def q = entityManager.createQuery("""
+
+select distinct dt.opzioni
+from    DefinizioneProcesso dp
+join    dp.definizioniTasks dt
+where
+        dp.nome='giudizio Ordinario di Cognizione'
+        and dt.nome = 'Selezione Soggetti'
+        and dt.codiceIdentificativo = 'SLZNE_SGGTTI_r3'
+
+""").resultList
+
+Long a = -2458965394380030000
+def bin = Long.toBinaryString(a)
+
+def abc = Long.toBinaryString(4)
+
+bin != abc
+ fin = bin+abc
+
+def q = 'bin : ' + bin + '   - bin+abc: ' + fin

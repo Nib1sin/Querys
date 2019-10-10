@@ -1,0 +1,272 @@
+select distinct
+       POS.id as [Id Posizione],
+       POS.ndgControparte as [Ndg Posizione],
+       POS.intestazione as [Nome Completo Posizione],
+       DP.nome as [Descrizione WF],
+       DT.nome as [Desrizione Task Corrente],
+	   CASE
+			when IP.statoIstanza = 1  then 'CREATO'
+			when IP.statoIstanza = 2  then 'ATTIVO'
+			when IP.statoIstanza = 6  then 'AGGIORNATO'
+			when IP.statoIstanza = 7  then 'TERMINATO'
+			when IP.statoIstanza = 9  then 'IN_ECCEZIONE'
+			when IP.statoIstanza = 10 then 'IN_MODIFICA'
+			else ''
+	   end as [Stato WorkFlow],
+	   CONVERT(varchar(10),it.audit_modifiedDate,(103)) as [Data Aggiornamento Task Corrente],
+	   IT.id as [Id Task Corrente],
+	   CASE
+			when IT.statoIstanza = 1  then 'CREATO'
+			when IT.statoIstanza = 2  then 'ATTIVO'
+			when IT.statoIstanza = 6  then 'AGGIORNATO'
+			when IT.statoIstanza = 9  then 'IN_ECCEZIONE'
+			when IT.statoIstanza = 10 then 'IN_MODIFICA'
+			else ''
+	   end as [Stato Task Corrente],
+	   Preventivo.preventivo as [Preventivo  - Preventivo],
+	   (Select COUNT(distinct iat.valoreStringa) from laweb4.istanzaattributotask iat where iat.istanzaTask_id = SOGGETTI.taskId) as [Numero Soggetti Anagrafici Collegati],		
+	   SUBSTRING(
+				(
+				select	distinct	
+							'; ' + iat_1.valoreStringa
+				from		laweb4.istanzaprocesso ip_1
+				inner join	laweb4.definizioneprocesso dp 
+				on			ip_1.definizioneprocesso_id = dp.id		
+				inner join	laweb4.istanzatask it
+				on			it.istanzaprocesso_id = ip_1.id
+				left join	laweb4.definizionetask dt 
+				on			dt.id = it.definizionetask_id
+				left join	laweb4.istanzaattributotask  iat_1 
+				on			iat_1.istanzaTask_id = it.id 
+				where 
+							dt.codiceIdentificativo = 'SLZNE_SGGTTI_r3'
+							and ip_1.id = IP.id
+				FOR XML PATH('')
+				)
+				,2,200000) AS [Soggetti Anagrafici Collegati],
+		CASE
+				when pos.tipologiaPosizione = 1 then (Select COUNT(distinct iat.valoreIntero) from laweb4.istanzaattributotask  iat where iat.istanzaTask_id = rapporti_wf.taskId) 
+				--when pos.tipologiaPosizione = 3 then COUNT(rapporti_wf.nota) --LEN(rapporti_wf.nota) 
+				when pos.tipologiaPosizione = 3 then (Select COUNT(it_1.nota) from laweb4.istanzaTask it_1 where it_1.id = rapporti_wf.taskId )
+				else ''
+		end as [Numero: Rapporti o Note collegati al WF],
+		CASE
+				when pos.tipologiaPosizione = 1 then	(SUBSTRING(
+																(
+																select	distinct	
+																			'; ' + r_1.CRAPPORT
+																from		laweb4.istanzaprocesso ip_1
+																left join	laweb4.definizioneprocesso dp 
+																on			ip_1.definizioneprocesso_id = dp.id
+																left join	(select * from laweb4.entitaprocesso where entita = 'POSIZIONE') ep 
+																on			ep.istanzaProcesso_id = ip_1.id
+																left join	laweb4.posizione POS_1 
+																on			ep.identita = pos_1.id 
+																left join	(select * from laweb4.istanzatask where (statoIstanza = 2 or statoIstanza = 6 or statoIstanza = 3) ) it 
+																on			it.istanzaprocesso_id = ip.id
+																left join	laweb4.definizionetask dt 
+																on			dt.id = it.definizionetask_id
+																left join	laweb4.istanzaattributotask  iat 
+																on			iat.istanzaTask_id = it.id 
+																left join	laweb4.rapporto r_1
+																on			r_1.posizione_id = pos_1.id
+																where 
+																			dp.descrizione = 'Giudizio ordinario di cognizione'
+																			and dt.codiceIdentificativo = 'SLZNE_RPPRTI_r3'
+																			and POS_1.id = Pos.id
+																			and r_1.id = iat.valoreIntero
+																			and ip_1.id = ip.id
+																FOR XML PATH('')
+																)
+																,2,200000))
+				when pos.tipologiaPosizione = 3 then	(SUBSTRING(
+																(		
+																select		
+																			'; ' + it.nota
+																from		laweb4.istanzaprocesso ip_1
+																left join	laweb4.definizioneprocesso dp 
+																on			ip_1.definizioneprocesso_id = dp.id
+																left join	(select * from laweb4.entitaprocesso where entita = 'POSIZIONE') ep 
+																on			ep.istanzaProcesso_id = ip_1.id
+																left join	laweb4.posizione POS_1 
+																on			ep.identita = pos_1.id 
+																left join	(select * from laweb4.istanzatask where (statoIstanza = 2 or statoIstanza = 6 or statoIstanza = 3) ) it 
+																on			it.istanzaprocesso_id = ip.id
+																left join	laweb4.definizionetask dt 
+																on			it.definizioneTask_id = dt.id
+																left join	laweb4.istanzaattributotask  iat 
+																on			iat.istanzaTask_id = it.id 
+																left join	laweb4.rapporto r_1
+																on			r_1.posizione_id = pos_1.id
+																where 
+																			dp.descrizione = 'Giudizio ordinario di cognizione'
+																			and dt.codiceIdentificativo = 'SLZNE_RPPRTI_r3'
+																			and POS_1.id = Pos.id
+																			and ip_1.id = ip.id
+																FOR XML PATH('')
+																)
+																,2,200000))
+				else null 
+		end AS [Rapporti o Note Collegati al Wf],
+		CONVERT(varchar(10),Giudizio_Ordinario_Cognizione.Data_Inizio_Azione,(103)) as [Giudizio Ordinario Cognizione - Data Inizio Azione],
+		Giudizio_Ordinario_Cognizione.Legale_Incaricato as [Giudizio Ordinario Cognizione - Legale Incaricato], 
+		Giudizio_Ordinario_Cognizione.Valore_Causa as [Giudizio Ordinario Cognizione - Valore Causa], 
+		Giudizio_Ordinario_Cognizione.Valore as [Giudizio Ordinario Cognizione - Valore], 
+		Giudizio_Ordinario_Cognizione.Ruolo_Banca as [Giudizio Ordinario Cognizione - Ruolo Banca]
+
+
+from		laweb4.istanzaprocesso IP
+inner join	laweb4.definizioneprocesso dp 
+on			ip.definizioneprocesso_id = dp.id
+inner join	laweb4.entitaprocesso EP 
+on			EP.istanzaprocesso_id = IP.id 
+			and EP.entita = 'POSIZIONE' 
+inner join	laweb4.posizione POS 
+on			POS.id = EP.identita
+inner join	laweb4.istanzatask IT 
+on			it.istanzaprocesso_id = ip.id 
+			and	(it.statoIstanza in (1,2,6,7,9,10))
+inner join	laweb4.definizionetask dt 
+on			dt.id = it.definizionetask_id
+left join	laweb4.istanzaattributotask  iat 
+on			iat.istanzaTask_id = it.id 
+left join	laweb4.AttributoProcesso ap 
+on			ap.id = iat.attributoprocesso_id 
+left join	laweb4.Rapporto r
+on			r.posizione_id = pos.id
+left join	(
+			select		
+						iat.id as iat_id,
+						iat.valoreStringa as soggetti,
+						it.id as taskId,
+						ip.id as ProcessoId
+			from		laweb4.istanzaprocesso ip
+			left join	laweb4.definizioneprocesso dp 
+			on			ip.definizioneprocesso_id = dp.id
+			left join	(select * from laweb4.istanzatask where (statoIstanza = 2 or statoIstanza = 6 or statoIstanza = 3) ) it 
+			on			it.istanzaprocesso_id = ip.id
+			left join	laweb4.definizionetask dt 
+			on			dt.id = it.definizionetask_id
+			left join	laweb4.istanzaattributotask  iat 
+			on			iat.istanzaTask_id = it.id 
+			where		
+						dp.descrizione = 'Giudizio ordinario di cognizione'
+						and dt.codiceIdentificativo = 'SLZNE_SGGTTI_r3'
+			) SOGGETTI
+on			SOGGETTI.ProcessoId = IP.id
+left join	(
+			select		
+						iat.valoreStringa as descrizioneRapporto,
+						iat.valoreIntero as idRapporto,
+						it.id as taskId,
+						ip.id as ProcessoId,
+						it.nota as nota
+			from		laweb4.istanzaprocesso ip
+			left join	laweb4.definizioneprocesso dp 
+			on			ip.definizioneprocesso_id = dp.id
+			left join	(select * from laweb4.istanzatask where (statoIstanza = 2 or statoIstanza = 6 or statoIstanza = 3) ) it 
+			on			it.istanzaprocesso_id = ip.id
+			left join	laweb4.definizionetask dt 
+			on			dt.id = it.definizionetask_id
+			left join	laweb4.istanzaattributotask  iat 
+			on			iat.istanzaTask_id = it.id 
+			where 
+						dp.descrizione = 'Giudizio ordinario di cognizione'
+						and dt.codiceIdentificativo = 'SLZNE_RPPRTI_r3'
+			) rapporti_wf
+on			rapporti_wf.ProcessoId = ip.id
+left join	(
+            select              
+					it.id as taskId,
+                    ip.id as ProcessoId,
+                    iat.valoreDecimale as Preventivo
+            from        laweb4.istanzaProcesso ip
+            left join   laweb4.definizioneProcesso dp
+            on          ip.definizioneProcesso_id = dp.id
+            left join	laweb4.istanzatask IT 
+			on			it.istanzaprocesso_id = ip.id 
+						and	(it.statoIstanza in (1,2,3,6))
+            left join   laweb4.definizioneTask dt
+            on          dt.id = it.definizioneTask_id
+            left join   laweb4.istanzaAttributoTask iat
+            on          iat.istanzaTask_id = it.id
+            left join   laweb4.attributoProcesso ap
+            on          ap.id = iat.attributoProcesso_id
+            where        
+                        dp.descrizione = 'Giudizio ordinario di cognizione'
+                        and dt.codiceIdentificativo = 'PRVNTVO'
+                        and ap.codice in ('IMPRTO_INGNTO')
+            ) Preventivo			
+on          Preventivo.ProcessoId = ip.id
+
+
+
+
+
+
+
+
+
+
+left join	(
+			select								
+					it.id as taskId,
+					ip.id as ProcessoId,
+					Data_Inizio_Azione = MAX(CASE
+						when ap.codice = '_DATA_INZO_AZNE' then iat.valoreData
+						else null end),
+					Legale_Incaricato = MAX(CASE
+						when ap.codice = 'LGLE_INCRCTO' then iat.valoreStringa
+						else null end),
+					Valore_Causa = MAX(CASE
+						when ap.codice = 'VLRE_GDZO_VLRE_CSA' then iat.valoreStringa
+						else null end),
+					Valore = MAX(CASE
+						when ap.codice = 'VLRE' then iat.valoreDecimale
+						else null end),
+					Ruolo_Banca = MAX(CASE
+						when ap.codice = 'RLO' then iat.valoreStringa
+						else null end)
+			from        laweb4.istanzaProcesso ip
+            left join   laweb4.definizioneProcesso dp
+            on          ip.definizioneProcesso_id = dp.id
+            left join	laweb4.istanzatask IT 
+			on			it.istanzaprocesso_id = ip.id 
+						and	(it.statoIstanza in (1,2,3,6))
+            left join   laweb4.definizioneTask dt
+            on          dt.id = it.definizioneTask_id
+            left join   laweb4.istanzaAttributoTask iat
+            on          iat.istanzaTask_id = it.id
+            left join   laweb4.attributoProcesso ap
+            on          ap.id = iat.attributoProcesso_id
+            where        
+                        dp.descrizione = 'Giudizio ordinario di cognizione'
+                        and dt.codiceIdentificativo = 'GDZO_ORDNRO_CGNZNE'
+                        and ap.codice in ('_DATA_INZO_AZNE', 'LGLE_INCRCTO', 'VLRE_GDZO_VLRE_CSA', 'VLRE', 'RLO')
+			group by
+						ip.id, it.id 
+			)Giudizio_Ordinario_Cognizione					
+on			Giudizio_Ordinario_Cognizione.ProcessoId = IP.id
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+where dp.descrizione = 'Giudizio ordinario di cognizione'
+
+group by
+pos.id, pos.ndgControparte, pos.intestazione, dp.nome, dt.nome, ip.statoIstanza, it.audit_modifiedDate, it.id, it.statoIstanza, SOGGETTI.taskId, Preventivo.Preventivo,
+ip.id, rapporti_wf.taskId, pos.tipologiaPosizione, rapporti_wf.nota,
+Giudizio_Ordinario_Cognizione.Data_Inizio_Azione, Giudizio_Ordinario_Cognizione.Legale_Incaricato, Giudizio_Ordinario_Cognizione.Valore_Causa, Giudizio_Ordinario_Cognizione.Valore, Giudizio_Ordinario_Cognizione.Ruolo_Banca
+
+
+			
